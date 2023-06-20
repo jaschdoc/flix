@@ -108,7 +108,7 @@ graalvmNative {
             mainClass = 'ca.uwaterloo.flix.Main'
             verbose = true
             richOutput = true
-            configurationFilesDirectory.from(file('resource-config.json'))
+            configurationFileDirectories.from(file('resource-config.json'))
 
             buildArgs.add('-H:Log=registerResource:5')
 
