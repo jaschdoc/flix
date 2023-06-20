@@ -1,6 +1,7 @@
 plugins {
     id 'application'
     id 'scala'
+    id 'org.graalvm.buildtools.native'
 }
 
 application {
@@ -92,7 +93,29 @@ task testAll(dependsOn: ['testClasses'], type: JavaExec) {
 
 test.dependsOn testAll
 
-task vscode(type: Copy, dependsOn:[clean, jar]) {
+task vscode(type: Copy, dependsOn: [clean, jar]) {
     from 'build/libs/flix.jar'
     into providers.gradleProperty('dev.flix.vscode.project')
+}
+
+graalvmNative {
+    binaries.all {
+        resources.autodetect()
+    }
+    binaries {
+        main {
+            imageName = 'flix'
+            mainClass = 'ca.uwaterloo.flix.Main'
+            verbose = true
+            richOutput = true
+            configurationFilesDirectory.from(file('resource-config.json'))
+
+            buildArgs.add('-H:Log=registerResource:5')
+
+            javaLauncher = javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(11)
+                vendor = JvmVendorSpec.matching("GraalVM Community")
+            }
+        }
+    }
 }
