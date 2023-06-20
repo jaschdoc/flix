@@ -1,7 +1,7 @@
 plugins {
     id 'application'
     id 'scala'
-    id 'org.graalvm.buildtools.native'
+    id 'org.graalvm.buildtools.native' version '0.9.23'
 }
 
 application {
