@@ -2,10 +2,10 @@
   "resources": {
     "includes": [
       {
-        "pattern": "main/**/*.flix$"
+        "pattern": "main/*/*.flix$"
       },
       {
-        "pattern": "main/**/*.zip$"
+        "pattern": "main/*/*.zip$"
       }
     ]
   }
