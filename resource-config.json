@@ -1,0 +1,24 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "./main/src/library/*.flix$"
+      },
+      {
+        "pattern": "./main/src/library/Concurrent/*.flix$"
+      },
+      {
+        "pattern": "./main/src/library/Fixpoint/*.flix$"
+      },
+      {
+        "pattern": "./main/src/library/Fixpoint/Ast/*.flix$"
+      },
+      {
+        "pattern": "./main/src/library/Fixpoint/Ram/*.flix$"
+      },
+      {
+        "pattern": "./main/src/library/Fixpoint/Shared/*.flix$"
+      }
+    ]
+  }
+}
