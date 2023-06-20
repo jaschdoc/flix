@@ -1,0 +1,12 @@
+https://www.graalvm.org/22.0/reference-manual/native-image/Reflection/
+
+https://www.graalvm.org/22.0/reference-manual/native-image/Resources/
+
+https://graalvm.github.io/native-build-tools/latest/index.html
+
+https://www.graalvm.org/22.2/reference-manual/native-image/metadata/
+
+https://www.graalvm.org/22.2/reference-manual/native-image/
+
+https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
+
