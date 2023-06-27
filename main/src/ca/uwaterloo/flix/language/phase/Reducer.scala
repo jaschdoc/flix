@@ -16,7 +16,7 @@
 package ca.uwaterloo.flix.language.phase
 
 import ca.uwaterloo.flix.api.Flix
-import ca.uwaterloo.flix.language.ast.{Ast, AtomicOp, ReducedAst, LiftedAst, Purity, Type}
+import ca.uwaterloo.flix.language.ast._
 
 object Reducer {
 
@@ -54,9 +54,9 @@ object Reducer {
 
     case LiftedAst.Expression.Var(sym, tpe, loc) => ReducedAst.Expr.Var(sym, tpe, loc)
 
-    case LiftedAst.Expression.Closure(sym, exps, tpe, loc) =>
+    case LiftedAst.Expression.ApplyAtomic(op, exps, tpe, purity, loc) =>
       val es = exps.map(visitExpr)
-      ReducedAst.Expr.Closure(sym, es, tpe, loc)
+      ReducedAst.Expr.ApplyAtomic(op, es, tpe, purity, loc)
 
     case LiftedAst.Expression.ApplyClo(exp, exps, tpe, purity, loc) =>
       val e = visitExpr(exp)
@@ -80,17 +80,6 @@ object Reducer {
       val fs = formals.map(visitFormalParam)
       val as = exps.map(visitExpr)
       ReducedAst.Expr.ApplySelfTail(sym, fs, as, tpe, purity, loc)
-
-    case LiftedAst.Expression.Unary(sop, exp, tpe, purity, loc) =>
-      val op = AtomicOp.Unary(sop)
-      val e = visitExpr(exp)
-      ReducedAst.Expr.ApplyAtomic(op, List(e), tpe, purity, loc)
-
-    case LiftedAst.Expression.Binary(sop, exp1, exp2, tpe, purity, loc) =>
-      val op = AtomicOp.Binary(sop)
-      val e1 = visitExpr(exp1)
-      val e2 = visitExpr(exp2)
-      ReducedAst.Expr.ApplyAtomic(op, List(e1, e2), tpe, purity, loc)
 
     case LiftedAst.Expression.IfThenElse(exp1, exp2, exp3, tpe, purity, loc) =>
       val e1 = visitExpr(exp1)
@@ -118,19 +107,9 @@ object Reducer {
       val e2 = visitExpr(exp2)
       ReducedAst.Expr.LetRec(varSym, index, defSym, e1, e2, tpe, purity, loc)
 
-    case LiftedAst.Expression.Region(tpe, loc) =>
-      val op = AtomicOp.Region
-      ReducedAst.Expr.ApplyAtomic(op, Nil, tpe, Purity.Pure, loc)
-
     case LiftedAst.Expression.Scope(sym, exp, tpe, purity, loc) =>
       val e = visitExpr(exp)
       ReducedAst.Expr.Scope(sym, e, tpe, purity, loc)
-
-    case LiftedAst.Expression.ScopeExit(exp1, exp2, tpe, purity, loc) =>
-      val op = AtomicOp.ScopeExit
-      val e1 = visitExpr(exp1)
-      val e2 = visitExpr(exp2)
-      ReducedAst.Expr.ApplyAtomic(op, List(e1, e2), tpe, purity, loc)
 
     case LiftedAst.Expression.Is(sym, exp, purity, loc) =>
       val op = AtomicOp.Is(sym)
@@ -240,6 +219,18 @@ object Reducer {
           ReducedAst.CatchRule(sym, clazz, b)
       }
       ReducedAst.Expr.TryCatch(e, rs, tpe, purity, loc)
+
+    case LiftedAst.Expression.TryWith(exp, effUse, rules, tpe, purity, loc) =>
+      // TODO AE erasing to unit for now
+      ReducedAst.Expr.Cst(Ast.Constant.Unit, Type.Unit, loc)
+
+    case LiftedAst.Expression.Do(op, exps, tpe, purity, loc) =>
+      // TODO AE erasing to unit for now
+      ReducedAst.Expr.Cst(Ast.Constant.Unit, Type.Unit, loc)
+
+    case LiftedAst.Expression.Resume(exp, tpe, loc) =>
+      // TODO AE erasing to unit for now
+      ReducedAst.Expr.Cst(Ast.Constant.Unit, Type.Unit, loc)
 
     case LiftedAst.Expression.InvokeConstructor(constructor, exps, tpe, purity, loc) =>
       val op = AtomicOp.InvokeConstructor(constructor)
