@@ -99,7 +99,7 @@ task vscode(type: Copy, dependsOn: [clean, jar]) {
 }
 
 graalvmNative {
-    toolChainDetection = true
+    toolchainDetection = true
 
     binaries.all {
         resources.autodetect()
