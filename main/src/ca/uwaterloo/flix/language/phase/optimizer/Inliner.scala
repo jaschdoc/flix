@@ -169,9 +169,13 @@ object Inliner {
     case Expr.ApplyAtomic(op, exps, tpe, eff, loc) =>
       val es = exps.map(visitExp(_, ctx0))
       if (es.forall(isCst)) {
-        constantFold(op, es) match {
-          case Some(exp) => exp
-          case None => Expr.ApplyAtomic(op, es, tpe, eff, loc)
+        constantFold(op, es, loc) match {
+          case Some(exp) =>
+            sctx.changed.putIfAbsent(sym0, ())
+            exp
+
+          case None =>
+            Expr.ApplyAtomic(op, es, tpe, eff, loc)
         }
       } else {
         Expr.ApplyAtomic(op, es, tpe, eff, loc)
@@ -368,7 +372,7 @@ object Inliner {
   }
 
   /** Applies `op` to `exps` if possible. */
-  private def constantFold(op: AtomicOp, exps: List[Expr]): Option[Expr] = op match {
+  private def constantFold(op: AtomicOp, exps: List[Expr], loc0: SourceLocation): Option[Expr] = op match {
     case AtomicOp.Closure(_) => None
     case AtomicOp.Region => None
     case AtomicOp.Is(_) => None
@@ -408,7 +412,6 @@ object Inliner {
     case AtomicOp.HoleError(_) => None
     case AtomicOp.MatchError => None
     case AtomicOp.CastError(_, _) => None
-
     case AtomicOp.Unary(sop) => sop match {
       case BoolOp.Not =>
         val List(Expr.Cst(Constant.Bool(bool), tpe, loc)) = exps
@@ -455,7 +458,409 @@ object Inliner {
         Some(Expr.Cst(Constant.Int64(~int), tpe, loc))
     }
 
-    case AtomicOp.Binary(sop) => None
+    case AtomicOp.Binary(sop) => sop match {
+      case BoolOp.And =>
+        val List(Expr.Cst(Constant.Bool(left), _, _), Expr.Cst(Constant.Bool(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left && right), Type.Bool, loc0))
+
+      case BoolOp.Or =>
+        val List(Expr.Cst(Constant.Bool(left), _, _), Expr.Cst(Constant.Bool(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left || right), Type.Bool, loc0))
+
+      case BoolOp.Eq =>
+        val List(Expr.Cst(Constant.Bool(left), _, _), Expr.Cst(Constant.Bool(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case BoolOp.Neq =>
+        val List(Expr.Cst(Constant.Bool(left), _, _), Expr.Cst(Constant.Bool(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case CharOp.Eq =>
+        val List(Expr.Cst(Constant.Char(left), _, _), Expr.Cst(Constant.Char(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case CharOp.Neq =>
+        val List(Expr.Cst(Constant.Char(left), _, _), Expr.Cst(Constant.Char(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case CharOp.Lt =>
+        val List(Expr.Cst(Constant.Char(left), _, _), Expr.Cst(Constant.Char(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case CharOp.Le =>
+        val List(Expr.Cst(Constant.Char(left), _, _), Expr.Cst(Constant.Char(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case CharOp.Gt =>
+        val List(Expr.Cst(Constant.Char(left), _, _), Expr.Cst(Constant.Char(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case CharOp.Ge =>
+        val List(Expr.Cst(Constant.Char(left), _, _), Expr.Cst(Constant.Char(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case Float32Op.Add =>
+        val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float32(left + right), tpe, loc0))
+
+      case Float32Op.Sub =>
+        val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float32(left - right), tpe, loc0))
+
+      case Float32Op.Mul =>
+        val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float32(left * right), tpe, loc0))
+
+      case Float32Op.Div =>
+        val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float32(left / right), tpe, loc0))
+
+      case Float32Op.Exp =>
+        val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float32(Math.pow(left, right).toFloat), tpe, loc0))
+
+      case Float32Op.Eq =>
+        val List(Expr.Cst(Constant.Float32(left), _, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case Float32Op.Neq =>
+        val List(Expr.Cst(Constant.Float32(left), _, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case Float32Op.Lt =>
+        val List(Expr.Cst(Constant.Float32(left), _, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case Float32Op.Le =>
+        val List(Expr.Cst(Constant.Float32(left), _, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case Float32Op.Gt =>
+        val List(Expr.Cst(Constant.Float32(left), _, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case Float32Op.Ge =>
+        val List(Expr.Cst(Constant.Float32(left), _, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case Float64Op.Add =>
+        val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float64(left + right), tpe, loc0))
+
+      case Float64Op.Sub =>
+        val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float64(left - right), tpe, loc0))
+
+      case Float64Op.Mul =>
+        val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float64(left * right), tpe, loc0))
+
+      case Float64Op.Div =>
+        val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float64(left / right), tpe, loc0))
+
+      case Float64Op.Exp =>
+        val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Float64(Math.pow(left, right)), tpe, loc0))
+
+      case Float64Op.Eq =>
+        val List(Expr.Cst(Constant.Float64(left), _, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case Float64Op.Neq =>
+        val List(Expr.Cst(Constant.Float64(left), _, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case Float64Op.Lt =>
+        val List(Expr.Cst(Constant.Float64(left), _, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case Float64Op.Le =>
+        val List(Expr.Cst(Constant.Float64(left), _, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case Float64Op.Gt =>
+        val List(Expr.Cst(Constant.Float64(left), _, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case Float64Op.Ge =>
+        val List(Expr.Cst(Constant.Float64(left), _, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case Int8Op.Add =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left + right).toByte), tpe, loc0))
+
+      case Int8Op.Sub =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left - right).toByte), tpe, loc0))
+
+      case Int8Op.Mul =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left * right).toByte), tpe, loc0))
+
+      case Int8Op.Div =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left / right).toByte), tpe, loc0))
+      case Int8Op.Rem =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left % right).toByte), tpe, loc0))
+
+      case Int8Op.Exp =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8(Math.pow(left, right).toByte), tpe, loc0))
+
+      case Int8Op.And =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left & right).toByte), tpe, loc0))
+
+      case Int8Op.Or =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left | right).toByte), tpe, loc0))
+
+      case Int8Op.Xor =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left ^ right).toByte), tpe, loc0))
+
+      case Int8Op.Shl =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left << right).toByte), tpe, loc0))
+
+      case Int8Op.Shr =>
+        val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int8((left >> right).toByte), tpe, loc0))
+
+      case Int8Op.Eq =>
+        val List(Expr.Cst(Constant.Int8(left), _, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case Int8Op.Neq =>
+        val List(Expr.Cst(Constant.Int8(left), _, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case Int8Op.Lt =>
+        val List(Expr.Cst(Constant.Int8(left), _, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case Int8Op.Le =>
+        val List(Expr.Cst(Constant.Int8(left), _, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case Int8Op.Gt =>
+        val List(Expr.Cst(Constant.Int8(left), _, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case Int8Op.Ge =>
+        val List(Expr.Cst(Constant.Int8(left), _, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case Int16Op.Add =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left + right).toShort), tpe, loc0))
+
+      case Int16Op.Sub =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left - right).toShort), tpe, loc0))
+
+      case Int16Op.Mul =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left * right).toShort), tpe, loc0))
+
+      case Int16Op.Div =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left / right).toShort), tpe, loc0))
+      case Int16Op.Rem =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left % right).toShort), tpe, loc0))
+
+      case Int16Op.Exp =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16(Math.pow(left, right).toShort), tpe, loc0))
+
+      case Int16Op.And =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left & right).toShort), tpe, loc0))
+
+      case Int16Op.Or =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left | right).toShort), tpe, loc0))
+
+      case Int16Op.Xor =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left ^ right).toShort), tpe, loc0))
+
+      case Int16Op.Shl =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left << right).toShort), tpe, loc0))
+
+      case Int16Op.Shr =>
+        val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int16((left >> right).toShort), tpe, loc0))
+
+      case Int16Op.Eq =>
+        val List(Expr.Cst(Constant.Int16(left), _, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case Int16Op.Neq =>
+        val List(Expr.Cst(Constant.Int16(left), _, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case Int16Op.Lt =>
+        val List(Expr.Cst(Constant.Int16(left), _, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case Int16Op.Le =>
+        val List(Expr.Cst(Constant.Int16(left), _, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case Int16Op.Gt =>
+        val List(Expr.Cst(Constant.Int16(left), _, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case Int16Op.Ge =>
+        val List(Expr.Cst(Constant.Int16(left), _, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case Int32Op.Add =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left + right), tpe, loc0))
+
+      case Int32Op.Sub =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left - right), tpe, loc0))
+
+      case Int32Op.Mul =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left * right), tpe, loc0))
+
+      case Int32Op.Div =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left / right), tpe, loc0))
+
+      case Int32Op.Rem =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left % right), tpe, loc0))
+
+      case Int32Op.Exp =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(Math.pow(left, right).toInt), tpe, loc0))
+
+      case Int32Op.And =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left & right), tpe, loc0))
+
+      case Int32Op.Or =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left | right), tpe, loc0))
+
+      case Int32Op.Xor =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left ^ right), tpe, loc0))
+
+      case Int32Op.Shl =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left << right), tpe, loc0))
+
+      case Int32Op.Shr =>
+        val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int32(left >> right), tpe, loc0))
+
+      case Int32Op.Eq =>
+        val List(Expr.Cst(Constant.Int32(left), _, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case Int32Op.Neq =>
+        val List(Expr.Cst(Constant.Int32(left), _, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case Int32Op.Lt =>
+        val List(Expr.Cst(Constant.Int32(left), _, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case Int32Op.Le =>
+        val List(Expr.Cst(Constant.Int32(left), _, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case Int32Op.Gt =>
+        val List(Expr.Cst(Constant.Int32(left), _, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case Int32Op.Ge =>
+        val List(Expr.Cst(Constant.Int32(left), _, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case Int64Op.Add =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left + right), tpe, loc0))
+
+      case Int64Op.Sub =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left - right), tpe, loc0))
+
+      case Int64Op.Mul =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left * right), tpe, loc0))
+
+      case Int64Op.Div =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left / right), tpe, loc0))
+
+      case Int64Op.Rem =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left % right), tpe, loc0))
+
+      case Int64Op.Exp =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(Math.pow(left.toDouble, right.toDouble).toLong), tpe, loc0))
+
+      case Int64Op.And =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left & right), tpe, loc0))
+
+      case Int64Op.Or =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left | right), tpe, loc0))
+
+      case Int64Op.Xor =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left ^ right), tpe, loc0))
+
+      case Int64Op.Shl =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left << right), tpe, loc0))
+
+      case Int64Op.Shr =>
+        val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Int64(left >> right), tpe, loc0))
+
+      case Int64Op.Eq =>
+        val List(Expr.Cst(Constant.Int64(left), _, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left == right), Type.Bool, loc0))
+
+      case Int64Op.Neq =>
+        val List(Expr.Cst(Constant.Int64(left), _, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left != right), Type.Bool, loc0))
+
+      case Int64Op.Lt =>
+        val List(Expr.Cst(Constant.Int64(left), _, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left < right), Type.Bool, loc0))
+
+      case Int64Op.Le =>
+        val List(Expr.Cst(Constant.Int64(left), _, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left <= right), Type.Bool, loc0))
+
+      case Int64Op.Gt =>
+        val List(Expr.Cst(Constant.Int64(left), _, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left > right), Type.Bool, loc0))
+
+      case Int64Op.Ge =>
+        val List(Expr.Cst(Constant.Int64(left), _, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Bool(left >= right), Type.Bool, loc0))
+
+      case StringOp.Concat =>
+        val List(Expr.Cst(Constant.Str(left), tpe, _), Expr.Cst(Constant.Str(right), _, _)) = exps
+        Some(Expr.Cst(Constant.Str(left + right), tpe, loc0))
+    }
   }
 
   /**
