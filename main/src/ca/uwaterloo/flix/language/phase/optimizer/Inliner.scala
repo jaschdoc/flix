@@ -19,6 +19,7 @@ package ca.uwaterloo.flix.language.phase.optimizer
 
 import ca.uwaterloo.flix.api.Flix
 import ca.uwaterloo.flix.language.ast.MonoAst.{Expr, FormalParam, Occur, Pattern}
+import ca.uwaterloo.flix.language.ast.SemanticOp.{BoolOp, CharOp, Float32Op, Float64Op, Int16Op, Int32Op, Int64Op, Int8Op, StringOp}
 import ca.uwaterloo.flix.language.ast.shared.Constant
 import ca.uwaterloo.flix.language.ast.{AtomicOp, MonoAst, SourceLocation, Symbol, Type}
 import ca.uwaterloo.flix.util.{InternalCompilerException, ParOps}
@@ -167,7 +168,14 @@ object Inliner {
 
     case Expr.ApplyAtomic(op, exps, tpe, eff, loc) =>
       val es = exps.map(visitExp(_, ctx0))
-      Expr.ApplyAtomic(op, es, tpe, eff, loc)
+      if (es.forall(isCst)) {
+        constantFold(op, es) match {
+          case Some(exp) => exp
+          case None => Expr.ApplyAtomic(op, es, tpe, eff, loc)
+        }
+      } else {
+        Expr.ApplyAtomic(op, es, tpe, eff, loc)
+      }
 
     case Expr.ApplyClo(exp1, exp2, tpe, eff, loc) =>
       visitExp(exp1, ctx0) match {
@@ -359,6 +367,97 @@ object Inliner {
       Expr.NewObject(name, clazz, tpe, eff, methods, loc)
   }
 
+  /** Applies `op` to `exps` if possible. */
+  private def constantFold(op: AtomicOp, exps: List[Expr]): Option[Expr] = op match {
+    case AtomicOp.Closure(_) => None
+    case AtomicOp.Region => None
+    case AtomicOp.Is(_) => None
+    case AtomicOp.Tag(_) => None
+    case AtomicOp.Untag(_, _) => None
+    case AtomicOp.Index(_) => None
+    case AtomicOp.Tuple => None
+    case AtomicOp.RecordSelect(_) => None
+    case AtomicOp.RecordExtend(_) => None
+    case AtomicOp.RecordRestrict(_) => None
+    case AtomicOp.ExtensibleIs(_) => None
+    case AtomicOp.ExtensibleTag(_) => None
+    case AtomicOp.ExtensibleUntag(_) => None
+    case AtomicOp.ArrayLit => None
+    case AtomicOp.ArrayNew => None
+    case AtomicOp.ArrayLoad => None
+    case AtomicOp.ArrayStore => None
+    case AtomicOp.ArrayLength => None
+    case AtomicOp.StructNew(_, _) => None
+    case AtomicOp.StructGet(_) => None
+    case AtomicOp.StructPut(_) => None
+    case AtomicOp.InstanceOf(_) => None
+    case AtomicOp.Cast => None
+    case AtomicOp.Unbox => None
+    case AtomicOp.Box => None
+    case AtomicOp.InvokeConstructor(_) => None
+    case AtomicOp.InvokeMethod(_) => None
+    case AtomicOp.InvokeStaticMethod(_) => None
+    case AtomicOp.GetField(_) => None
+    case AtomicOp.PutField(_) => None
+    case AtomicOp.GetStaticField(_) => None
+    case AtomicOp.PutStaticField(_) => None
+    case AtomicOp.Throw => None
+    case AtomicOp.Spawn => None
+    case AtomicOp.Lazy => None
+    case AtomicOp.Force => None
+    case AtomicOp.HoleError(_) => None
+    case AtomicOp.MatchError => None
+    case AtomicOp.CastError(_, _) => None
+
+    case AtomicOp.Unary(sop) => sop match {
+      case BoolOp.Not =>
+        val List(Expr.Cst(Constant.Bool(bool), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Bool(!bool), tpe, loc))
+
+      case Float32Op.Neg =>
+        val List(Expr.Cst(Constant.Float32(float), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Float32(-float), tpe, loc))
+
+      case Float64Op.Neg =>
+        val List(Expr.Cst(Constant.Float64(float), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Float64(-float), tpe, loc))
+
+      case Int8Op.Neg =>
+        val List(Expr.Cst(Constant.Int8(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int8((-int).toByte), tpe, loc))
+
+      case Int8Op.Not =>
+        val List(Expr.Cst(Constant.Int8(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int8((~int).toByte), tpe, loc))
+
+      case Int16Op.Neg =>
+        val List(Expr.Cst(Constant.Int16(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int16((-int).toShort), tpe, loc))
+
+      case Int16Op.Not =>
+        val List(Expr.Cst(Constant.Int16(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int16((~int).toShort), tpe, loc))
+
+      case Int32Op.Neg =>
+        val List(Expr.Cst(Constant.Int32(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int32(-int), tpe, loc))
+
+      case Int32Op.Not =>
+        val List(Expr.Cst(Constant.Int32(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int32(~int), tpe, loc))
+
+      case Int64Op.Neg =>
+        val List(Expr.Cst(Constant.Int64(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int64(-int), tpe, loc))
+
+      case Int64Op.Not =>
+        val List(Expr.Cst(Constant.Int64(int), tpe, loc)) = exps
+        Some(Expr.Cst(Constant.Int64(~int), tpe, loc))
+    }
+
+    case AtomicOp.Binary(sop) => None
+  }
+
   /**
     * Returns a pattern with fresh variables and a substitution mapping the old variables the fresh variables.
     *
@@ -496,6 +595,13 @@ object Inliner {
     case Expr.ApplyAtomic(AtomicOp.Binary(_), exps, _, _, _) => exps.forall(isTrivial)
     case Expr.ApplyAtomic(AtomicOp.Tag(_), exps, _, _, _) => exps.forall(isTrivial)
     case Expr.ApplyAtomic(AtomicOp.Tuple, exps, _, _, _) => exps.forall(isTrivial)
+    case _ => false
+  }
+
+  /** Returns `true` if `exp` is a constant / literal but not a regex. */
+  private def isCst(exp: Expr): Boolean = exp match {
+    case Expr.Cst(Constant.Regex(_), _, _) => false
+    case Expr.Cst(_, _, _) => true
     case _ => false
   }
 
