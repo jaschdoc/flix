@@ -1202,7 +1202,7 @@ object Inliner {
     */
   private def shouldInlineDef(defn: MonoAst.Def, exps: List[Expr], ctx0: LocalContext): Boolean = {
     !ctx0.currentlyInlining && !defn.spec.defContext.isSelfRef &&
-      (isSingleCall(defn.exp) || isSimple(defn.exp) || hasKnownLambda(exps))
+      (isSingleAction(defn.exp) || isSimple(defn.exp) || hasKnownLambda(exps))
   }
 
   /**
@@ -1277,6 +1277,7 @@ object Inliner {
   }
 
   /**
+    *
     * Returns `true` if `exp0` is considered a literal.
     *
     * A simple expression is one of the following:
@@ -1290,7 +1291,6 @@ object Inliner {
     * A simple expression can be reduced by beta reduction, constant folding or deforestation.
     */
   private def isLiteral(exp0: Expr): Boolean = exp0 match {
-    case Expr.Lambda(_, _, _, _) => true
     case Expr.ApplyAtomic(AtomicOp.Unary(_), exps, _, _, _) => exps.forall(isCst)
     case Expr.ApplyAtomic(AtomicOp.Binary(_), exps, _, _, _) => exps.forall(isCst)
     case Expr.ApplyAtomic(AtomicOp.Tuple, exps, _, _, _) => exps.forall(e => isCst(e) || isLiteral(e))
@@ -1299,54 +1299,48 @@ object Inliner {
   }
 
   /**
-    * Returns `true` if `exp0` is considered simple.
+    * Returns `true` if `exp0` is a simple expression.
     *
-    * A simple expression is one of the following:
-    *   - [[Expr.Lambda]]
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.Unary]] where for all operands [[isTrivial]] holds.
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.Binary]] where for all operands [[isTrivial]] holds.
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.Tuple]] where for all subexpressions either [[isTrivial]] or [[isSimple]] holds.
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.Tag]] where for all subexpressions either [[isTrivial]] or [[isSimple]] holds.
-    *   - Any expression where [[isTrivial]] holds.
-    *
-    * A simple expression can be reduced by beta reduction, constant folding or deforestation.
+    * A simple expression is a value-like expression where sub-expressions are trivial.
     */
   private def isSimple(exp0: Expr): Boolean = exp0 match {
     case Expr.Lambda(_, _, _, _) => true
     case Expr.ApplyAtomic(AtomicOp.Unary(_), exps, _, _, _) => exps.forall(isTrivial)
     case Expr.ApplyAtomic(AtomicOp.Binary(_), exps, _, _, _) => exps.forall(isTrivial)
-    case Expr.ApplyAtomic(AtomicOp.Tuple, exps, _, _, _) => exps.forall(e => isTrivial(e) || isSimple(e))
     case Expr.ApplyAtomic(AtomicOp.Tag(_), exps, _, _, _) => exps.forall(e => isTrivial(e) || isSimple(e))
+    case Expr.ApplyAtomic(AtomicOp.Tuple, exps, _, _, _) => exps.forall(e => isTrivial(e) || isSimple(e))
+    case Expr.ApplyAtomic(AtomicOp.ArrayLit, exps, _, _, _) => exps.forall(isTrivial)
+    case Expr.ApplyAtomic(AtomicOp.StructNew(_, _), exps, _, _, _) => exps.forall(isTrivial)
     case Expr.Cast(exp, _, _, _) => isSimple(exp)
     case Expr.Ascribe(exp, _, _, _) => isSimple(exp)
     case exp => isTrivial(exp)
   }
 
   /**
-    * Returns `true` if `exp0` is a single call expression.
+    * Returns `true` if `exp0` is a single action expression.
     *
-    * A single call is expression is one of the following:
-    *   - [[Expr.ApplyClo]] where [[isSimple]] holds for all subexpressions.
-    *   - [[Expr.ApplyDef]] where [[isSimple]] holds for all subexpressions.
-    *   - [[Expr.LocalDef]] where the following expression is [[Expr.ApplyLocalDef]] and
-    *     [[isSimple]] holds for all subexpressions of the latter.
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.InvokeMethod]] where for all subexpressions [[isSimple]] holds.
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.InvokeConstructor]] where for all subexpressions [[isSimple]] holds.
-    *   - [[Expr.ApplyAtomic]] with [[AtomicOp.InvokeStaticMethod]] where for all subexpressions [[isSimple]] holds.
-    *   - [[Expr.Cast]] where [[isSingleCall]] holds for the subexpression.
-    *
-    * This captures functions that simply forward to another function with possibly additional simple arguments.
-    * Inlining such a function reduces code size.
+    * An expression is a single action if it performs one computational step. For example:
+    * - A single call with simple arguments.
+    * - A single arithmetic operation with simple arguments.
+    * - A single array operation with simple arguments.
+    * - A single JVM operation with simple arguments.
     */
   @tailrec
-  private def isSingleCall(exp0: Expr): Boolean = exp0 match {
+  private def isSingleAction(exp0: Expr): Boolean = exp0 match {
     case Expr.ApplyClo(exp1, exp2, _, _, _) => isSimple(exp1) && isSimple(exp2)
     case Expr.ApplyDef(_, exps, _, _, _, _) => exps.forall(isSimple)
     case Expr.LocalDef(_, _, _, Expr.ApplyLocalDef(_, exps, _, _, _), _, _, _, _) => exps.forall(isSimple)
+    case Expr.Cast(exp, _, _, _) => isSingleAction(exp)
+    case Expr.ApplyAtomic(AtomicOp.ArrayNew, exps, _, _, _) => exps.forall(isSimple)
+    case Expr.ApplyAtomic(AtomicOp.ArrayLoad, exps, _, _, _) => exps.forall(isSimple)
+    case Expr.ApplyAtomic(AtomicOp.ArrayStore, exps, _, _, _) => exps.forall(isSimple)
+    case Expr.ApplyAtomic(AtomicOp.ArrayLength, exps, _, _, _) => exps.forall(isSimple)
     case Expr.ApplyAtomic(AtomicOp.InvokeMethod(_), exps, _, _, _) => exps.forall(isSimple)
-    case Expr.ApplyAtomic(AtomicOp.InvokeConstructor(_), exps, _, _, _) => exps.forall(isSimple)
     case Expr.ApplyAtomic(AtomicOp.InvokeStaticMethod(_), exps, _, _, _) => exps.forall(isSimple)
-    case Expr.Cast(exp, _, _, _) => isSingleCall(exp)
+    case Expr.ApplyAtomic(AtomicOp.GetField(_), exps, _, _, _) => exps.forall(isSimple)
+    case Expr.ApplyAtomic(AtomicOp.PutField(_), exps, _, _, _) => exps.forall(isSimple)
+    case Expr.ApplyAtomic(AtomicOp.GetStaticField(_), exps, _, _, _) => exps.forall(isSimple)
+    case Expr.ApplyAtomic(AtomicOp.PutStaticField(_), exps, _, _, _) => exps.forall(isSimple)
     case _ => false
   }
 
@@ -1441,15 +1435,17 @@ object Inliner {
 
     case (Expr.ApplyAtomic(AtomicOp.Tag(sym1), exps, _, _, _), Pattern.Tag(sym2, pats, _, _)) =>
       if (sym1 == sym2.sym) {
-        exps.zip(pats).map { case (e, p) => unifyPattern(e, p) }
-          .foldLeft(UnificationResult.SuccessEmpty)(UnificationResult.combine)
+        exps.zip(pats).map {
+          case (e, p) => unifyPattern(e, p)
+        }.foldLeft(UnificationResult.SuccessEmpty)(UnificationResult.combine)
       } else {
         UnificationResult.Failure
       }
 
     case (Expr.ApplyAtomic(AtomicOp.Tuple, exps, _, _, _), Pattern.Tuple(pats, _, _)) =>
-      exps.zip(pats).map { case (e, p) => unifyPattern(e, p) }
-        .foldLeft(UnificationResult.SuccessEmpty)(UnificationResult.combine)
+      exps.zip(pats).map {
+        case (e, p) => unifyPattern(e, p)
+      }.foldLeft(UnificationResult.SuccessEmpty)(UnificationResult.combine)
 
     case (Expr.Cst(Constant.RecordEmpty, _, _), Pattern.Record(Nil, Pattern.Cst(Constant.RecordEmpty, _, _), _, _)) =>
       UnificationResult.SuccessEmpty
