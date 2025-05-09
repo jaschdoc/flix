@@ -1009,7 +1009,7 @@ object Inliner {
     * Returns true if `exp0` is a lambda and the size of its definition is less than or equal to
     * the size of the call.
     */
-  private def noSizeIncrease(exp0: Expr, ctx0: LocalContext)(implicit root: MonoAst.Root): Boolean = exp0 match {
+  private def noSizeIncrease(exp0: Expr, ctx0: LocalContext): Boolean = exp0 match {
     case Expr.Lambda(_, exp, _, _) =>
       val bodySize = size(exp)
       val args = collectLambdaArgs(exp0, ctx0.exprCtx, ctx0)
