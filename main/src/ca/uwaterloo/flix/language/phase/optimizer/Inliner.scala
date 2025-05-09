@@ -521,11 +521,7 @@ object Inliner {
 
       case Float32Op.Div =>
         val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
-        if (right != 0) {
           Some(Expr.Cst(Constant.Float32(left / right), tpe, loc0))
-        } else {
-          Some(Expr.Cst(Constant.Float32(0), tpe, loc0))
-        }
 
       case Float32Op.Exp =>
         val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
@@ -569,11 +565,7 @@ object Inliner {
 
       case Float64Op.Div =>
         val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
-        if (right != 0) {
           Some(Expr.Cst(Constant.Float64(left / right), tpe, loc0))
-        } else {
-          Some(Expr.Cst(Constant.Float64(0), tpe, loc0))
-        }
 
       case Float64Op.Exp =>
         val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
