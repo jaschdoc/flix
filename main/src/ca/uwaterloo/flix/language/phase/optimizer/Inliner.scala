@@ -1001,7 +1001,7 @@ object Inliner {
     * Returns `true` if the `exp` should be inlined at the calling occurrence site
     * for a variable that has occurrence information [[Occur.Many]].
     */
-  private def shouldInlineMulti(exp: Expr, ctx0: LocalContext)(implicit root: MonoAst.Root): Boolean = {
+  private def shouldInlineMulti(exp: Expr, ctx0: LocalContext): Boolean = {
     noSizeIncrease(exp, ctx0) || (someBenefit(exp, ctx0) && (isTrivial(exp) || smallEnough(exp, ctx0)))
   }
 
@@ -1186,7 +1186,7 @@ object Inliner {
     * Throws an error if `sym` is not in scope. This also implies that it is the responsibility of the caller
     * to replace any symbol occurrence with the corresponding fresh symbol in the variable substitution.
     */
-  private def useSiteInline(sym: Symbol.VarSym, ctx0: LocalContext)(implicit root: MonoAst.Root): Option[Expr] = {
+  private def useSiteInline(sym: Symbol.VarSym, ctx0: LocalContext): Option[Expr] = {
     ctx0.inScopeVars.get(sym) match {
       case Some(BoundKind.LetBound(exp, occur)) if shouldInlineVar(sym, exp, occur, ctx0) =>
         Some(exp)
@@ -1204,7 +1204,7 @@ object Inliner {
     *
     * A lambda should be inlined if it has occurrence information [[Occur.OnceInLambda]] or [[Occur.OnceInLocalDef]].
     */
-  private def shouldInlineVar(sym: Symbol.VarSym, exp: Expr, occur: Occur, ctx0: LocalContext)(implicit root: MonoAst.Root): Boolean = (occur, exp.eff) match {
+  private def shouldInlineVar(sym: Symbol.VarSym, exp: Expr, occur: Occur, ctx0: LocalContext): Boolean = (occur, exp.eff) match {
     case (Occur.Dead, _) => throw InternalCompilerException(s"unexpected call site inline of dead variable $sym", exp.loc)
     case (Occur.Once, Type.Pure) => throw InternalCompilerException(s"unexpected call site inline of pre-inlined variable $sym", exp.loc)
     case (Occur.OnceInLambda, Type.Pure) => (isTrivial(exp) || isLambda(exp)) && someBenefit(exp, ctx0)
