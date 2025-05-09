@@ -1160,7 +1160,7 @@ object Inliner {
     */
   private def shouldInlineDef(defn: MonoAst.Def, exps: List[Expr], ctx0: LocalContext): Boolean = {
     !ctx0.currentlyInlining && !defn.spec.defContext.isSelfRef &&
-      (isSingleCall(defn.exp) || isSimple(defn.exp) || hasKnownLambda(exps))
+      (isSingleCall(defn.exp) || isSimple(defn.exp) || hasKnownLambda(exps) || hasSimpleArg(exps))
   }
 
   /**
@@ -1168,6 +1168,13 @@ object Inliner {
     */
   private def hasKnownLambda(exps: List[Expr]): Boolean = {
     exps.exists(isLambda)
+  }
+
+  /**
+    * Returns `true` if [[isSimple]] holds for at least one expression in `exps`.
+    */
+  private def hasSimpleArg(exps: List[Expr]): Boolean = {
+    exps.exists(isSimple)
   }
 
   /**
