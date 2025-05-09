@@ -530,7 +530,11 @@ object Inliner {
 
       case Float32Op.Div =>
         val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Float32(left / right), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Float32(left / right), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Float32(0), tpe, loc0))
+        }
 
       case Float32Op.Exp =>
         val List(Expr.Cst(Constant.Float32(left), tpe, _), Expr.Cst(Constant.Float32(right), _, _)) = exps
@@ -574,7 +578,11 @@ object Inliner {
 
       case Float64Op.Div =>
         val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Float64(left / right), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Float64(left / right), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Float64(0), tpe, loc0))
+        }
 
       case Float64Op.Exp =>
         val List(Expr.Cst(Constant.Float64(left), tpe, _), Expr.Cst(Constant.Float64(right), _, _)) = exps
@@ -618,10 +626,19 @@ object Inliner {
 
       case Int8Op.Div =>
         val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int8((left / right).toByte), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int8((left / right).toByte), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int8(0), tpe, loc0))
+        }
+
       case Int8Op.Rem =>
         val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int8((left % right).toByte), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int8((left % right).toByte), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int8(0), tpe, loc0))
+        }
 
       case Int8Op.Exp =>
         val List(Expr.Cst(Constant.Int8(left), tpe, _), Expr.Cst(Constant.Int8(right), _, _)) = exps
@@ -685,10 +702,19 @@ object Inliner {
 
       case Int16Op.Div =>
         val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int16((left / right).toShort), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int16((left / right).toShort), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int16(0), tpe, loc0))
+        }
+
       case Int16Op.Rem =>
         val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int16((left % right).toShort), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int16((left % right).toShort), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int16(0), tpe, loc0))
+        }
 
       case Int16Op.Exp =>
         val List(Expr.Cst(Constant.Int16(left), tpe, _), Expr.Cst(Constant.Int16(right), _, _)) = exps
@@ -752,11 +778,19 @@ object Inliner {
 
       case Int32Op.Div =>
         val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int32(left / right), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int32(left / right), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int32(0), tpe, loc0))
+        }
 
       case Int32Op.Rem =>
         val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int32(left % right), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int32(left % right), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int32(0), tpe, loc0))
+        }
 
       case Int32Op.Exp =>
         val List(Expr.Cst(Constant.Int32(left), tpe, _), Expr.Cst(Constant.Int32(right), _, _)) = exps
@@ -820,11 +854,19 @@ object Inliner {
 
       case Int64Op.Div =>
         val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int64(left / right), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int64(left / right), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int64(0), tpe, loc0))
+        }
 
       case Int64Op.Rem =>
         val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
-        Some(Expr.Cst(Constant.Int64(left % right), tpe, loc0))
+        if (right != 0) {
+          Some(Expr.Cst(Constant.Int64(left % right), tpe, loc0))
+        } else {
+          Some(Expr.Cst(Constant.Int64(0), tpe, loc0))
+        }
 
       case Int64Op.Exp =>
         val List(Expr.Cst(Constant.Int64(left), tpe, _), Expr.Cst(Constant.Int64(right), _, _)) = exps
