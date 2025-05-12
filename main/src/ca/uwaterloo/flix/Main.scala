@@ -104,6 +104,7 @@ object Main {
       XPerfPar = cmdOpts.XPerfPar,
       XPerfN = cmdOpts.XPerfN,
       xiterations = cmdOpts.xiterations,
+      xnooptimizer = false
     )
 
     // Don't use progress bar if benchmarking.
