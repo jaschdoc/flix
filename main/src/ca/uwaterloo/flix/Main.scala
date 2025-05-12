@@ -316,10 +316,10 @@ object Main {
           CompilerMemory.run(options)
 
         case Command.SetupInlinerBenchmark(asprofPath) =>
-          BenchmarkInliner.generateSetup(options.copy(progress = false), micro = true, asprofPath = asprofPath)
+          BenchmarkInliner.generateSetup(options.copy(progress = false), cmdOpts.benchmarkSuite, asprofPath)
 
         case Command.RunInlinerBenchmark =>
-          BenchmarkInliner.runCompilerBenchmark(options.copy(progress = false), micro = true)
+          BenchmarkInliner.runCompilerBenchmark(options.copy(progress = false), cmdOpts.benchmarkSuite)
 
         case Command.Zhegalkin =>
           ZhegalkinPerf.run(options.XPerfN)
@@ -363,7 +363,9 @@ object Main {
                      XPerfFrontend: Boolean = false,
                      XPerfPar: Boolean = false,
                      xiterations: Int = 1000,
-                     files: Seq[File] = Seq())
+                     files: Seq[File] = Seq(),
+                     benchmarkSuite: BenchmarkInliner.Suite = BenchmarkInliner.Suite.Micro
+                    )
 
   /**
     * A case class representing possible commands.
@@ -505,7 +507,18 @@ object Main {
               case (value, c) if value.isBlank => c.copy(command = Command.SetupInlinerBenchmark(None))
               case (value, c) => c.copy(command = Command.SetupInlinerBenchmark(Some(value)))
             }
-            .text("path to async-profiler shared library (leave blank if you do not want to attach)")
+            .text("path to async-profiler shared library (leave blank if you do not want to attach)"),
+          opt[String]("suite")
+            .action {
+              case (value, c) => value.toLowerCase match {
+                case "micro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Micro)
+                case "medium" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Medium)
+                case "macro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Macro)
+                case "all" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.All)
+                case _ => c
+              }
+            }
+            .text("the suite of programs to run ('micro', 'medium', 'macro', 'all') - default is 'micro'")
         )
 
       note("")

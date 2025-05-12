@@ -34,6 +34,20 @@ import scala.util.{Failure, Success, Using}
 
 object BenchmarkInliner {
 
+  sealed trait Suite
+
+  object Suite {
+
+    case object Micro extends Suite
+
+    case object Medium extends Suite
+
+    case object Macro extends Suite
+
+    case object All extends Suite
+
+  }
+
   private val RunningTimeWarmupTime: Int = 5
 
   private val RunningTimeBenchmarkTime: Int = 5
@@ -96,12 +110,17 @@ object BenchmarkInliner {
 
   private def pythonPath: Path = scriptOutputPath.resolve("plots.py").normalize()
 
-  def generateSetup(opts: Options, micro: Boolean = true, asprofPath: Option[String]): Unit = {
+  def generateSetup(opts: Options, suite: Suite, asprofPath: Option[String]): Unit = {
     println("Generating setup...")
 
     // TODO: Maybe pass this as a program config to the run instance
     // TODO: Then create public pre-made configs in this object
-    val programs = if (micro) MicroBenchmarks else MacroBenchmarks
+    val programs = suite match {
+      case Suite.Micro => MicroBenchmarks
+      case Suite.Medium => ???
+      case Suite.Macro => MacroBenchmarks
+      case Suite.All => MicroBenchmarks ++ MacroBenchmarks
+    }
 
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
@@ -136,9 +155,19 @@ object BenchmarkInliner {
        |""".stripMargin
   }
 
-  def runCompilerBenchmark(opts: Options, micro: Boolean = true): Unit = {
-    val programs = if (micro) MicroBenchmarks else MacroBenchmarks
-    val outFileName = if (micro) "micro.json" else "macro.json"
+  def runCompilerBenchmark(opts: Options, suite: Suite): Unit = {
+    val programs = suite match {
+      case Suite.Micro => MicroBenchmarks
+      case Suite.Medium => ???
+      case Suite.Macro => MacroBenchmarks
+      case Suite.All => ???
+    }
+    val outFileName = suite match {
+      case Suite.Micro => "micro.json"
+      case Suite.Medium => ???
+      case Suite.Macro => "macro.json"
+      case Suite.All => ???
+    }
 
     println("Benchmarking inliner compilation...")
     val t0 = System.nanoTime()
