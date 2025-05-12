@@ -315,8 +315,8 @@ object Main {
         case Command.CompilerMemory =>
           CompilerMemory.run(options)
 
-        case Command.SetupInlinerBenchmark =>
-          BenchmarkInliner.generateSetup(options.copy(progress = false), micro = true, asprofPath = None)
+        case Command.SetupInlinerBenchmark(asprofPath) =>
+          BenchmarkInliner.generateSetup(options.copy(progress = false), micro = true, asprofPath = asprofPath)
 
         case Command.RunInlinerBenchmark =>
           BenchmarkInliner.runCompilerBenchmark(options.copy(progress = false), micro = true)
@@ -408,7 +408,7 @@ object Main {
 
     case object Zhegalkin extends Command
 
-    case object SetupInlinerBenchmark extends Command
+    case class SetupInlinerBenchmark(asprofPath: Option[String]) extends Command
 
     case object RunInlinerBenchmark extends Command
   }
@@ -493,6 +493,20 @@ object Main {
           .action((v, c) => c.copy(XPerfN = Some(v)))
           .text("number of compilations")
       ).hidden()
+
+      cmd("benchmark-inliner-compiler").action((_, c) => c.copy(command = Command.RunInlinerBenchmark))
+        .text("Benchmark compilation for inliner")
+
+      cmd("setup-inliner-benchmark").action((_, c) => c.copy(command = Command.SetupInlinerBenchmark(None)))
+        .text("Sets up inliner experiments")
+        .children(
+          opt[String]("asprof")
+            .action {
+              case (value, c) if value.isBlank => c.copy(command = Command.SetupInlinerBenchmark(None))
+              case (value, c) => c.copy(command = Command.SetupInlinerBenchmark(Some(value)))
+            }
+            .text("path to async-profiler shared library (leave blank if you do not want to attach)")
+        )
 
       note("")
 
