@@ -315,6 +315,12 @@ object Main {
         case Command.CompilerMemory =>
           CompilerMemory.run(options)
 
+        case Command.SetupInlinerBenchmark =>
+          BenchmarkInliner.generateSetup(options.copy(progress = false), micro = true, asprofPath = None)
+
+        case Command.RunInlinerBenchmark =>
+          BenchmarkInliner.runCompilerBenchmark(options.copy(progress = false), micro = true)
+
         case Command.Zhegalkin =>
           ZhegalkinPerf.run(options.XPerfN)
 
@@ -402,6 +408,9 @@ object Main {
 
     case object Zhegalkin extends Command
 
+    case object SetupInlinerBenchmark extends Command
+
+    case object RunInlinerBenchmark extends Command
   }
 
   /**
