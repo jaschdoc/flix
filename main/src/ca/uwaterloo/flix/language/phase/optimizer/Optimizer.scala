@@ -37,10 +37,9 @@ object Optimizer {
     val (afterOccurrenceAnalyzer0, graph, sccs) = OccurrenceAnalyzer.run(currentRoot, currentDelta, computeDependencyGraph = true)
     var afterOccurrenceAnalyzer = afterOccurrenceAnalyzer0
     var depGraph = graph
-    while (depGraph.nonEmpty) {
+    for (_ <- 0 until MaxRounds) {
       depGraph match {
         case Nil =>
-          throw InternalCompilerException("unexpected empty dependency graph", SourceLocation.Unknown)
 
         case group :: Nil =>
           depGraph = List.empty
@@ -65,6 +64,6 @@ object Optimizer {
         // Case 4: It is an entrypoint so always include it.
         currentLive.contains(sym) || currentRoot.entryPoints.contains(sym) || sccs.contains(sym)
     }
-    currentRoot.copy(defs = liveDefs)
+    currentRoot
   }
 }
