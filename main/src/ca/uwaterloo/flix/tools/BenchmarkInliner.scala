@@ -63,6 +63,9 @@ object BenchmarkInliner {
     */
   private val Verbose: Boolean = true
 
+  /**
+    * A set of benchmarks that are small and quick to run which are specifically targeted by the optimizer.
+    */
   private val MicroBenchmarks: Map[String, String] = Map(
     "List.filter" -> listFilter,
     "List.foldLeft" -> listFoldLeft,
@@ -83,10 +86,17 @@ object BenchmarkInliner {
     "filterMap10kOptimized" -> filterMap10KOptimized
   )
 
+  /**
+    * A set of benchmarks that are not targeted directly by the optimizer
+    * but remain small programs.
+    */
   private val MediumBenchmarks: Map[String, String] = Map(
     "mutualRecursion" -> mutualRecursion,
   )
 
+  /**
+    * A set of benchmarks that are full programs or libraries or expensive functions.
+    */
   private val MacroBenchmarks: Map[String, String] = Map(
     "RailRoadNetwork" -> railRoadNetwork,
     "FordFulkerson" -> fordFulkerson,
