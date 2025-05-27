@@ -110,6 +110,7 @@ object BenchmarkInliner {
     "Sequence" -> sequence,
     "SingleSourceShortestDistance" -> singleSourceShortestDistance,
     "SingleSourceShortestPaths" -> singleSourceShortestPaths,
+    "SingleSourceShortestPathsArbitrary" -> singleSourceShortestPathsArbitrary,
   )
 
   private def baseDir: Path = Path.of("./build/").normalize()
@@ -1933,6 +1934,124 @@ object BenchmarkInliner {
       |
       |def runBenchmark(): Unit \ IO = {
       |    ShortestPath.sssp(0, ShortestPath.exampleGraph01()) |> blackhole
+      |}
+      |
+      |""".stripMargin
+  }
+
+  private def singleSourceShortestPathsArbitrary: String = {
+    """
+      |mod ShortestPathN {
+      |
+      |    use Path.{Path, Bot};
+      |
+      |    pub def ssspn(src: t, g: m[(t, Int32, t)]): Map[t, Vector[t]] \Foldable.Aef[m] with Foldable[m], Order[t] = {
+      |        let edges = inject g into Edge;
+      |        let rules = #{
+      |            Reach(x, y; init(y, l, x)) :- Edge(x, l, y).
+      |            Reach(x, z; cons(z, l, p)) :- Reach(x, y; p), Edge(y, l, z).
+      |        };
+      |        let res = query edges, rules select (t, p) from Reach(src, t; p);
+      |        res |> Functor.map(match (t, p) -> (t, Foldable.toVector(p) |> Vector.reverse))
+      |            |> Foldable.toMap
+      |    }
+      |
+      |    pub enum Path[a] with ToString {
+      |        case Path(List[a], Int32)
+      |        case Bot
+      |    }
+      |
+      |    instance Eq[Path[a]] {
+      |        pub def eq(x: Path[a], y: Path[a]): Bool = match (x, y) {
+      |            case (Bot, Bot)                 => true
+      |            case (Path(_, l1), Path(_, l2)) => l1 == l2
+      |            case _                          => false
+      |        }
+      |    }
+      |
+      |    instance Order[Path[a]] with Order[a] {
+      |        pub def compare(x: Path[a], y: Path[a]): Comparison = match (x, y) {
+      |            case (Bot, Bot)                 => Comparison.EqualTo
+      |            case (Bot, _)                   => Comparison.LessThan
+      |            case (_, Bot)                   => Comparison.GreaterThan
+      |            case (Path(list1, l1), Path(list2, l2)) =>
+      |                let comp1 = l1 <=> l2;
+      |                if(comp1 != Comparison.EqualTo) {
+      |                    comp1
+      |                } else {
+      |                    list1 <=> list2
+      |                }
+      |        }
+      |    }
+      |
+      |    instance LowerBound[Path[a]] {
+      |        pub def minValue(): Path[a] = Bot
+      |    }
+      |
+      |    instance PartialOrder[Path[a]] {
+      |        pub def lessEqual(x: Path[a], y: Path[a]): Bool = match (x, y) {
+      |            case (Bot, _)                   => true
+      |            case (Path(_, l1), Path(_, l2)) => l1 >= l2
+      |            case _                          => false
+      |        }
+      |    }
+      |
+      |    instance JoinLattice[Path[a]] {
+      |        pub def leastUpperBound(x: Path[a], y: Path[a]): Path[a] = match (x, y) {
+      |            case (Bot, p)                   => p
+      |            case (p, Bot)                   => p
+      |            case (Path(_, l1), Path(_, l2)) => if (l1 <= l2) x else y
+      |        }
+      |    }
+      |
+      |    instance MeetLattice[Path[a]] {
+      |        pub def greatestLowerBound(x: Path[a], y: Path[a]): Path[a] = match (x, y) {
+      |            case (Bot, _)                   => Bot
+      |            case (_, Bot)                   => Bot
+      |            case (Path(_, l1), Path(_, l2)) => if (l1 > l2) x else y
+      |        }
+      |    }
+      |
+      |    instance Foldable[Path] {
+      |        pub def foldLeft(f: b -> (a -> b \ ef), s: b, t: Path[a]): b \ ef = match t {
+      |            case Bot     => s
+      |            case Path(p, _) => Foldable.foldLeft(f, s, p)
+      |        }
+      |
+      |        pub def foldRight(f: a -> (b -> b \ ef), s: b, t: Path[a]): b \ ef = match t {
+      |            case Bot     => s
+      |            case Path(p, _) => Foldable.foldRight(f, s, p)
+      |        }
+      |
+      |        pub def foldRightWithCont(f: a -> ((Unit -> b \ ef) -> b \ ef), s: b, t: Path[a]): b \ ef = match t {
+      |            case Bot     => s
+      |            case Path(p, _) => Foldable.foldRightWithCont(f, s, p)
+      |        }
+      |    }
+      |
+      |    pub def init(y: a,  l: Int32, x: a): Path[a] =
+      |        Path(y :: x :: Nil, l)
+      |
+      |    pub def cons(z: a, l: Int32, p: Path[a]): Path[a] = match (p) {
+      |        case Bot          => Bot
+      |        case Path(xs, l1) => Path(z :: xs, l1 + l)
+      |    }
+      |
+      |    pub def indexOf(x: a, p: Path[a]): Option[Int32] with Eq[a] = match p {
+      |        case Bot         => None
+      |        case Path(xs, _) => List.indexOf(x, xs)
+      |    }
+      |
+      |    pub def exampleGraph04(): Set[(Int32, Int32, Int32)] =
+      |        Set#{  (0, 1, 1), (0, 3 , 4 ), (0, 10, 7 ), (1, 1, 2 ), (2, 1 , 3),
+      |               (2, 1, 5), (3, 1 , 10), (4, 1 , 1 ), (4, 3, 5 ), (5, 1 , 7),
+      |               (5, 3, 6), (6, 1 , 9 ), (6, 1 , 2 ), (6, 3, 10), (7, 10, 8),
+      |               (8, 1, 6), (8, 10, 9 ), (9, 10, 10)
+      |            }
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    ShortestPathN.ssspn(0, ShortestPathN.exampleGraph04()) |> blackhole
       |}
       |
       |""".stripMargin
