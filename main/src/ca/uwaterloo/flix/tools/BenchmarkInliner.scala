@@ -109,6 +109,7 @@ object BenchmarkInliner {
     "FordFulkerson" -> fordFulkerson,
     "IDE" -> ide,
     "IFDS" -> ifds,
+    "Interpreter" -> interpreter,
     "Palindrome" -> palindrome,
     "Parsers" -> parsers,
     "Sequence" -> sequence,
@@ -1876,6 +1877,147 @@ object BenchmarkInliner {
       |
       |    blackhole(result)
       |}
+      |""".stripMargin
+  }
+
+  private def interpreter: String = {
+    """
+      |enum AExp {
+      |    case Cst(Int32),
+      |    case Plus(AExp, AExp),
+      |    case Minus(AExp, AExp),
+      |    case Times(AExp, AExp),
+      |    case IfThenElse(BExp, AExp, AExp)
+      |}
+      |
+      |enum BExp {
+      |    case True,
+      |    case False,
+      |    case Not(BExp),
+      |    case Conj(BExp, BExp),
+      |    case Disj(BExp, BExp),
+      |    case Eq(AExp, AExp),
+      |    case Neq(AExp, AExp)
+      |}
+      |
+      |def evalAExp(e: AExp): Int32 = match e {
+      |    case AExp.Cst(i)                 => i
+      |    case AExp.Plus(e1, e2)           => evalAExp(e1) + evalAExp(e2)
+      |    case AExp.Minus(e1, e2)          => evalAExp(e1) - evalAExp(e2)
+      |    case AExp.Times(e1, e2)          => evalAExp(e1) * evalAExp(e2)
+      |    case AExp.IfThenElse(e1, e2, e3) =>
+      |        let cond = evalBExp(e1);
+      |            if (cond) evalAExp(e2) else evalAExp(e3)
+      |}
+      |
+      |def evalBExp(e: BExp): Bool = match e {
+      |    case BExp.True           => true
+      |    case BExp.False          => false
+      |    case BExp.Not(e1)        => not evalBExp(e1)
+      |    case BExp.Conj(e1, e2)   => evalBExp(e1) and evalBExp(e2)
+      |    case BExp.Disj(e1, e2)   => evalBExp(e1) or evalBExp(e2)
+      |    case BExp.Eq(e1, e2)     => evalAExp(e1) == evalAExp(e2)
+      |    case BExp.Neq(e1,e2)     => evalAExp(e1) != evalAExp(e2)
+      |}
+      |
+      |enum Inst {
+      |    case Push(Int32),
+      |    case Add,
+      |    case Sub,
+      |    case Mul,
+      |    case Neg,
+      |    case And,
+      |    case Or,
+      |    case Cmp,
+      |    case Branch(List[Inst], List[Inst])
+      |}
+      |
+      |def compileAExp(e: AExp): List[Inst] = match e {
+      |    case AExp.Cst(i)         => Inst.Push(i) :: Nil
+      |    case AExp.Plus(e1, e2)   =>
+      |        let is1 = compileAExp(e1);
+      |        let is2 = compileAExp(e2);
+      |            is2 ::: is1 ::: Inst.Add :: Nil
+      |    case AExp.Minus(e1, e2)  =>
+      |        let is1 = compileAExp(e1);
+      |        let is2 = compileAExp(e2);
+      |            is2 ::: is1 ::: Inst.Sub :: Nil
+      |    case AExp.Times(e1, e2)  =>
+      |        let is1 = compileAExp(e1);
+      |        let is2 = compileAExp(e2);
+      |            is2 ::: is1 ::: Inst.Mul :: Nil
+      |    case AExp.IfThenElse(e1, e2, e3)  =>
+      |        let is1 = compileBExp(e1);
+      |        let is2 = compileAExp(e2);
+      |        let is3 = compileAExp(e3);
+      |            is1 ::: Inst.Branch(is2, is3) :: Nil
+      |}
+      |
+      |def compileBExp(e: BExp): List[Inst] = match e {
+      |    case BExp.True           => Inst.Push(1) :: Nil
+      |    case BExp.False          => Inst.Push(0) :: Nil
+      |    case BExp.Not(e1)         =>
+      |        let is = compileBExp(e1);
+      |            is ::: Inst.Neg :: Nil
+      |    case BExp.Conj(e1, e2)   =>
+      |        let is1 = compileBExp(e1);
+      |        let is2 = compileBExp(e2);
+      |            is2 ::: is1 ::: Inst.And :: Nil
+      |    case BExp.Disj(e1, e2)   =>
+      |        let is1 = compileBExp(e1);
+      |        let is2 = compileBExp(e2);
+      |            is2 ::: is1 ::: Inst.Or :: Nil
+      |    case BExp.Eq(e1, e2)     =>
+      |        let is1 = compileAExp(e1);
+      |        let is2 = compileAExp(e2);
+      |            is2 ::: is1 ::: Inst.Cmp :: Nil
+      |    case BExp.Neq(e1, e2)    =>
+      |        let is1 = compileAExp(e1);
+      |        let is2 = compileAExp(e2);
+      |            is2 ::: is1 ::: Inst.Neg :: Inst.Cmp :: Nil
+      |}
+      |
+      |def evalInst(instructions: List[Inst], stack: List[Int32]): Int32 = match (instructions, stack) {
+      |    case (Nil, x :: _) => x
+      |    case ((Inst.Push(i)) :: rs, st) => evalInst(rs, i :: st)
+      |    case (Inst.Add :: rs, i1 :: i2 :: st) => evalInst(rs, (i1 + i2) :: st)
+      |    case (Inst.Sub :: rs, i1 :: i2 :: st) => evalInst(rs, (i1 - i2) :: st)
+      |    case (Inst.Mul :: rs, i1 :: i2 :: st) => evalInst(rs, (i1 * i2) :: st)
+      |    case (Inst.Neg :: rs, i :: st) =>
+      |        if (i == 0)
+      |            evalInst(rs, 1 :: st)
+      |        else
+      |            evalInst(rs, 0 :: st)
+      |    case (Inst.And :: rs, i1 :: i2 :: st) =>
+      |        if (i1 != 0 and i2 != 0)
+      |            evalInst(rs, 1 :: st)
+      |        else
+      |            evalInst(rs, 0 :: st)
+      |    case (Inst.Or :: rs, i1 :: i2 :: st) =>
+      |        if (i1 != 0 or i2 != 0)
+      |            evalInst(rs, 1 :: st)
+      |        else
+      |            evalInst(rs, 0 :: st)
+      |    case (Inst.Cmp :: rs, i1 :: i2 :: st) =>
+      |        if (i1 == i2)
+      |            evalInst(rs, 1 :: st)
+      |        else
+      |            evalInst(rs, 0 :: st)
+      |    case ((Inst.Branch(is1, is2)) :: _, i :: st) =>
+      |        if (i != 0)
+      |            evalInst(is1, st)
+      |        else
+      |            evalInst(is2, st)
+      |    case _ => ???
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    let e = AExp.IfThenElse(BExp.Eq(AExp.Cst(1), AExp.Cst(2)), AExp.Cst(42), AExp.Times(AExp.Cst(21), AExp.Cst(82)));
+      |    let a = evalAExp(e);
+      |    let b = evalInst(compileAExp(e), Nil);
+      |    blackhole(a == b)
+      |}
+      |
       |""".stripMargin
   }
 
