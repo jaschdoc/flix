@@ -93,6 +93,7 @@ object BenchmarkInliner {
   private val MediumBenchmarks: Map[String, String] = Map(
     "mutualRecursion" -> mutualRecursion,
     "imperativeForLoops" -> imperativeForLoops,
+    "internalMutability" -> internalMutability,
   )
 
   /**
@@ -972,6 +973,30 @@ object BenchmarkInliner {
       |    (Ref.get(c) == Ref.get(d)) |> blackhole;
       |    (Ref.get(c) == Ref.get(cf)) |> blackhole
       |}
+      |""".stripMargin
+  }
+
+  private def internalMutability: String = {
+    """
+      |def deduplicate(l: List[a]): List[a] with Order[a] =
+      |    region rc {
+      |
+      |        let s = MutSet.empty(rc);
+      |
+      |        List.filter(x -> {
+      |            if (MutSet.memberOf(x, s))
+      |                false // `x` has already been seen.
+      |            else {
+      |                MutSet.add(x, s);
+      |                true
+      |            }
+      |        }, l)
+      |    }
+      |
+      |def runBenchmark(): Unit \ IO =
+      |    let l = 1 :: 1 :: 2 :: 2 :: 3 :: 3 :: Nil;
+      |    deduplicate(l) |> blackhole
+      |
       |""".stripMargin
   }
 
