@@ -1230,30 +1230,14 @@ object BenchmarkInliner {
 
   private def fordFulkerson: String = {
     """
-      |///
-      |/// The Ford-Fulkerson algorithm finds the maximum flow of a flow network.
-      |/// Here it is implemented using a combination of functional programming
-      |/// and datalog.
-      |///
-      |pub def runBenchmark(): Unit \ IO =
+      |pub def runBenchmark(): Unit \ IO = {
       |    FordFulkerson.exampleGraph01() |> FordFulkerson.maxFlow(0, 5) |> blackhole
+      |}
       |
       |mod FordFulkerson {
       |
       |    use Path.{Path, Bot};
       |
-      |    ///
-      |    /// Returns the maximum flow from `src` to `dst` in the flow network `g`.
-      |    /// N.B.: `g` is a directed graph with upper bounds / capacity on the edges.
-      |    /// No pre-assigned flow is allowed.
-      |    ///
-      |    /// The following assumptions also apply:
-      |    /// - `src` and `dst` is connected in `g`
-      |    /// - `g` contains no negative cycles
-      |    /// - `g` is labeled in ascending order from `src` to `sink`
-      |    /// - The label of `src` has the lowest value in the graph
-      |    /// - The label of `dst` has the highest value in the graph
-      |    ///
       |    pub def maxFlow(src: t, dst: t, g: m[(t, Int32, t)]): Int32 \ Foldable.Aef[m] with Foldable[m], Order[t] =
       |        def fordFulkerson(flowNetwork) = match augmentingPath(src, dst, flowNetwork) {
       |            case None       => getMaxFlow(dst, flowNetwork)
@@ -1262,30 +1246,17 @@ object BenchmarkInliner {
       |                let updatedNetwork = increaseFlow(path, incr, flowNetwork);
       |                fordFulkerson(updatedNetwork)
       |        };
-      |        // Init with 0 flow
       |        fordFulkerson(zeroFlow(g))
       |
-      |    ///
-      |    /// Returns a flow network with zero flow.
-      |    ///
       |    def zeroFlow(g: m[(t, Int32, t)]): Vector[(t, Int32, Int32, t)] \ Foldable.Aef[m] with Foldable[m], Order[t] =
       |        Foldable.toVector(g) |> Vector.map(match (x, y, z) -> (x, y, 0, z))
       |
-      |    ///
-      |    /// Returns the sum of the flows on all directly ingoing edges to `dst`.
-      |    ///
       |    def getMaxFlow(dst: t, g: m[(t, Int32, Int32, t)]): Int32 \ Foldable.Aef[m] with Foldable[m], Order[t] =
       |        g
       |        |> Foldable.toVector
       |        |> Vector.filterMap(match (_, _, f, d) -> if (d == dst) Some(f) else None)
       |        |> Vector.sum
       |
-      |    ///
-      |    /// Returns an augmenting path if one exists.
-      |    ///
-      |    /// An edge is in an augmenting path if its flow can be increased, i.e., the flow is strictly less than the capacity,
-      |    /// or if it has non-zero flow.
-      |    ///
       |    def augmentingPath(src: t, dst: t, g: m[(t, Int32, Int32, t)]): Option[Path[t]] \ Foldable.Aef[m] with Foldable[m], Order[t] =
       |        let edges = inject g into Edge;
       |        let rules = #{
@@ -1297,9 +1268,6 @@ object BenchmarkInliner {
       |        let result = query edges, rules select fn from Reach(src, dst; fn);
       |        Vector.head(result)
       |
-      |    ///
-      |    /// Returns the most constraining capacity of `g` on the `Path` `p`.
-      |    ///
       |    def minCapacity(p: Path[t], g: m[(t, Int32, Int32, t)]): Int32 \ Foldable.Aef[m] with Foldable[m], Order[t] =
       |        let onPath = (s, d) -> isForwardEdge(s, d, p) or isBackEdge(s, d, p);
       |        let optMin = g |> Foldable.filter(match (s, _, _, d) -> onPath(s, d))
@@ -1307,12 +1275,9 @@ object BenchmarkInliner {
       |            |> List.minimum;
       |        match optMin {
       |            case Some(u) => u
-      |            case None    => unreachable!() // This function is only called by `maxFlow` if an augmenting path was found
+      |            case None    => unreachable!()
       |        }
       |
-      |    ///
-      |    /// Returns a new flow network where the edges in `g` on the `Path` `p` has been adjusted by `incr`.
-      |    ///
       |    def increaseFlow(p: Path[t], incr: Int32, g: m[(t, Int32, Int32, t)]): Vector[(t, Int32, Int32, t)] \ Foldable.Aef[m] with Foldable[m], Order[t] =
       |        g
       |        |> Foldable.toVector
@@ -1325,18 +1290,12 @@ object BenchmarkInliner {
       |                (s, u, f, d)
       |        )
       |
-      |    ///
-      |    /// Returns true if `src` is an edge pointing to `dst` on the `Path` `p`.
-      |    ///
       |    def isForwardEdge(src: t, dst: t, p: Path[t]): Bool with Eq[t] =
       |        match (indexOf(src, p), indexOf(dst, p)) { // A path is sorted in reverse order
       |            case (Some(si), Some(di)) if di + 1 == si => true
       |            case _ => false
       |        }
       |
-      |    ///
-      |    /// Returns true if `dst` is an edge pointing to `src` on the `Path` `p`.
-      |    ///
       |    def isBackEdge(src: t, dst: t, p: Path[t]): Bool with Eq[t] =
       |        match (indexOf(src, p), indexOf(dst, p)) { // A path is sorted in reverse order
       |            case (Some(si), Some(di)) if si + 1 == di => true
@@ -1366,7 +1325,6 @@ object BenchmarkInliner {
       |    }
       |
       |    instance LowerBound[Path[a]] {
-      |        // The longest list
       |        pub def minValue(): Path[a] = Bot
       |    }
       |
@@ -1394,63 +1352,21 @@ object BenchmarkInliner {
       |        }
       |    }
       |
-      |    ///
-      |    /// Returns a `Path` from `x` to `y`.
-      |    ///
       |    pub def init(y: a, x: a): Path[a] =
       |        Path(y :: x :: Nil)
       |
-      |    ///
-      |    /// Extends the `Path` `p` with `z`.
-      |    ///
       |    pub def cons(z: a, p: Path[a]): Path[a] = match p {
       |        case Bot      => Bot
       |        case Path(xs) => Path(z :: xs)
       |    }
       |
-      |    ///
-      |    /// Returns the index of `a` in the `Path` `p`.
-      |    /// Note that a `Path` is sorted in descending order.
-      |    ///
       |    pub def indexOf(x: a, p: Path[a]): Option[Int32] with Eq[a] = match p {
       |        case Bot      => None
       |        case Path(xs) => List.indexOf(x, xs)
       |    }
       |
-      |    //////////////////////////////////////////
-      |    // Tests                                //
-      |    //////////////////////////////////////////
-      |
-      |    ///
-      |    /// Returns the following graph:
-      |    ///
-      |    /// ```
-      |    ///      1---2
-      |    ///     /|\  |\
-      |    ///    0 | \ | 5
-      |    ///     \|  \|/
-      |    ///      3---4
-      |    /// ```
-      |    ///
-      |    /// The edges are directed as follows (ordered from left to right, top to bottom):
-      |    ///
-      |    /// ```
-      |    /// 0 -> 1, capacity 10
-      |    /// 0 -> 3, capacity 10
-      |    /// 1 -> 3, capacity 2
-      |    /// 1 -> 2, capacity 4
-      |    /// 1 -> 4, capacity 8
-      |    /// 3 -> 4, capacity 9
-      |    /// 4 -> 2, capacity 6
-      |    /// 2 -> 5, capacity 10
-      |    /// 4 -> 5, capacity 10
-      |    /// ```
-      |    ///
-      |    /// The maximum flow is `19`.
-      |    ///
       |    pub def exampleGraph01(): Set[(Int32, Int32, Int32)] =
       |        Set#{ (0, 10, 1), (0, 10, 3), (1, 2, 3), (1, 4, 2), (1, 8, 4), (2, 10, 5), (3, 9, 4), (4, 6, 2), (4, 10, 5) }
-      |
       |}
       |""".stripMargin
   }
