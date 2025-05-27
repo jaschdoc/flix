@@ -108,6 +108,7 @@ object BenchmarkInliner {
     "Palindrome" -> palindrome,
     "Parsers" -> parsers,
     "Sequence" -> sequence,
+    "SingleSourceShortestPaths" -> singleSourceShortestPaths,
   )
 
   private def baseDir: Path = Path.of("./build/").normalize()
@@ -1796,6 +1797,110 @@ object BenchmarkInliner {
       |
       |    };
       |    query lp <+> numLetters select (x, y) from Read(x, y) |> blackhole
+      |}
+      |
+      |""".stripMargin
+  }
+
+  private def singleSourceShortestPaths: String = {
+    """
+      |mod ShortestPath {
+      |
+      |    use Path.{Path, Bot};
+      |
+      |    pub def sssp(src: t, g: m[(t, t)]): Map[t, Vector[t]] \ Foldable.Aef[m] with Foldable[m], Order[t] = {
+      |        let edges = inject g into Edge;
+      |        let rules = #{
+      |            Reach(x, y; init(y, x)) :- Edge(x, y).
+      |            Reach(x, z; cons(z, p)) :- Reach(x, y; p), Edge(y, z).
+      |        };
+      |        let res = query edges, rules select (t, p) from Reach(src, t; p);
+      |        res |> Functor.map(match (t, p) -> (t, Foldable.toVector(p) |> Vector.reverse))
+      |            |> Foldable.toMap
+      |    }
+      |
+      |    pub enum Path[a] with ToString {
+      |        case Path(List[a])
+      |        case Bot
+      |    }
+      |
+      |    instance Eq[Path[a]] {
+      |        pub def eq(x: Path[a], y: Path[a]): Bool = match (x, y) {
+      |            case (Bot, Bot)           => true
+      |            case (Path(xs), Path(ys)) => List.length(xs) == List.length(ys)
+      |            case _                    => false
+      |        }
+      |    }
+      |
+      |    instance Order[Path[a]] with Order[a] {
+      |        pub def compare(x: Path[a], y: Path[a]): Comparison = match (x, y) {
+      |            case (Bot, Bot)                 => Comparison.EqualTo
+      |            case (Bot, _)                   => Comparison.LessThan
+      |            case (_, Bot)                   => Comparison.GreaterThan
+      |            case (Path(list1), Path(list2)) => list1 <=> list2
+      |        }
+      |    }
+      |
+      |    instance LowerBound[Path[a]] {
+      |        // The longest list
+      |        pub def minValue(): Path[a] = Bot
+      |    }
+      |
+      |    instance PartialOrder[Path[a]] {
+      |        pub def lessEqual(x: Path[a], y: Path[a]): Bool = match (x, y) {
+      |            case (Bot, _)             => true
+      |            case (Path(xs), Path(ys)) => List.length(xs) >= List.length(ys)
+      |            case _                    => false
+      |        }
+      |    }
+      |
+      |    instance JoinLattice[Path[a]] {
+      |        pub def leastUpperBound(x: Path[a], y: Path[a]): Path[a] = match (x, y) {
+      |            case (Bot, p)             => p
+      |            case (p, Bot)             => p
+      |            case (Path(xs), Path(ys)) => if (List.length(xs) <= List.length(ys)) x else y
+      |        }
+      |    }
+      |
+      |    instance MeetLattice[Path[a]] {
+      |        pub def greatestLowerBound(x: Path[a], y: Path[a]): Path[a] = match (x, y) {
+      |            case (Bot, _)             => Bot
+      |            case (_, Bot)             => Bot
+      |            case (Path(xs), Path(ys)) => if (List.length(xs) > List.length(ys)) x else y
+      |        }
+      |    }
+      |
+      |    instance Foldable[Path] {
+      |        pub def foldLeft(f: b -> (a -> b \ ef), s: b, t: Path[a]): b \ ef = match t {
+      |            case Bot     => s
+      |            case Path(p) => Foldable.foldLeft(f, s, p)
+      |        }
+      |
+      |        pub def foldRight(f: a -> (b -> b \ ef), s: b, t: Path[a]): b \ ef = match t {
+      |            case Bot     => s
+      |            case Path(p) => Foldable.foldRight(f, s, p)
+      |        }
+      |
+      |        pub def foldRightWithCont(f: a -> ((Unit -> b \ ef) -> b \ ef), s: b, t: Path[a]): b \ ef = match t {
+      |            case Bot     => s
+      |            case Path(p) => Foldable.foldRightWithCont(f, s, p)
+      |        }
+      |    }
+      |
+      |    pub def init(y: a, x: a): Path[a] =
+      |        Path(y :: x :: Nil)
+      |
+      |    pub def cons(z: a, p: Path[a]): Path[a] = match p {
+      |        case Bot      => Bot
+      |        case Path(xs) => Path(z :: xs)
+      |    }
+      |
+      |    pub def exampleGraph01(): Set[(Int32, Int32)] =
+      |        Set#{ (0, 1), (0, 3), (1, 4), (1, 2), (1, 3), (2, 5), (3, 4), (4, 2), (4, 5) }
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    ShortestPath.sssp(0, ShortestPath.exampleGraph01()) |> blackhole
       |}
       |
       |""".stripMargin
