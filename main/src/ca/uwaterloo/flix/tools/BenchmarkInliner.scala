@@ -31,7 +31,6 @@ import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.util.zip.{ZipEntry, ZipOutputStream}
 import java.util.{Calendar, GregorianCalendar}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.ListHasAsScala
 import scala.util.{Failure, Success, Using}
 
 object BenchmarkInliner {
@@ -2889,7 +2888,7 @@ object BenchmarkInliner {
   }
 
   private def talpin1992: String = {
-    Files.lines(Path.of("./Talpin1992.flix").normalize()).toList.asScala.mkString("\n")
+    Files.lines(Path.of("./Talpin1992.flix").normalize()).toArray.mkString("\n")
   }
 
   private def Python: String =
