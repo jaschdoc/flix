@@ -1198,14 +1198,13 @@ object BenchmarkInliner {
       |        input |>
       |        longestPalindromeSequence |>
       |        Option.map(match (b,e) -> String.slice(start = b, end = e+1, input)) |>
-      |        Option.getWithDefault("nothing") |>
-      |        blackhole
+      |        Option.getWithDefault("nothing")
       |    };
       |
       |    trial("ABBAIsCool") |> blackhole;
       |    trial("Hello") |> blackhole;
       |    trial("YaddaYaddaYadda") |> blackhole;
-      |    trial("abammabba" |> blackhole
+      |    trial("abammabba") |> blackhole
       |}
       |
       |def longestPalindromeSequence(s: String): Option[(Int32, Int32)] = {
