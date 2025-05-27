@@ -84,6 +84,7 @@ object BenchmarkInliner {
   )
 
   private val MediumBenchmarks: Map[String, String] = Map(
+    "mutualRecursion" -> mutualRecursion,
   )
 
   private val MacroBenchmarks: Map[String, String] = Map(
@@ -869,6 +870,19 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    Set.range(0, 100) |> Set.foldRight(Add.add, 0) |> blackhole
       |}
+      |""".stripMargin
+  }
+
+  private def mutualRecursion: String = {
+    """
+      |def isOdd(n: Int32): Bool =
+      |    if (n == 0) false else isEvn(n - 1)
+      |
+      |def isEvn(n: Int32): Bool =
+      |    if (n == 0) true else isOdd(n - 1)
+      |
+      |def runBenchmark(): Unit \ IO =
+      |    isOdd(12345) |> blackhole
       |""".stripMargin
   }
 
