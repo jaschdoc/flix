@@ -533,7 +533,7 @@ object BenchmarkInliner {
 
   private def blackhole: String = {
     """
-      |pub def blackhole(t: a): Unit \\ IO =
+      |pub def blackhole(t: a): Unit \ IO =
       |    Ref.fresh(Static, t); ()
       |""".stripMargin
   }
