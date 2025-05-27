@@ -107,6 +107,7 @@ object BenchmarkInliner {
     */
   private val MacroBenchmarks: Map[String, String] = Map(
     "FordFulkerson" -> fordFulkerson,
+    "FloydWarshall" -> floydWarshall,
     "IDE" -> ide,
     "IFDS" -> ifds,
     "Interpreter" -> interpreter,
@@ -1369,6 +1370,83 @@ object BenchmarkInliner {
       |
       |    pub def exampleGraph01(): Set[(Int32, Int32, Int32)] =
       |        Set#{ (0, 10, 1), (0, 10, 3), (1, 2, 3), (1, 4, 2), (1, 8, 4), (2, 10, 5), (3, 9, 4), (4, 6, 2), (4, 10, 5) }
+      |}
+      |""".stripMargin
+  }
+
+  private def floydWarshall: String = {
+    """
+      |enum Dist with Eq, Order, ToString {
+      |  case Bot,
+      |  case Dst(Int32),
+      |  case Top
+      |}
+      |
+      |instance LowerBound[Dist] {
+      |    pub def minValue(): Dist = Dist.Bot
+      |}
+      |
+      |instance PartialOrder[Dist] {
+      |    pub def lessEqual(x: Dist, y: Dist): Bool = match (x, y) {
+      |        case (_, Dist.Top)                => true
+      |        case (Dist.Bot, _)                => true
+      |        case (Dist.Dst(n1), Dist.Dst(n2)) => n1 >= n2
+      |        case _                            => false
+      |    }
+      |}
+      |
+      |instance JoinLattice[Dist] {
+      |    pub def leastUpperBound(x: Dist, y: Dist): Dist = match (x, y) {
+      |        case (Dist.Bot, _)                => y
+      |        case (_, Dist.Bot)                => x
+      |        case (Dist.Dst(n1), Dist.Dst(n2)) => Dist.Dst(Int32.min(n1, n2))
+      |        case _                            => Dist.Top
+      |    }
+      |}
+      |
+      |instance MeetLattice[Dist] {
+      |    pub def greatestLowerBound(x: Dist, y: Dist): Dist = match (x, y) {
+      |        case (Dist.Top, z)                => z
+      |        case (z, Dist.Top)                => z
+      |        case (Dist.Dst(n1), Dist.Dst(n2)) => Dist.Dst(Int32.max(n1, n2))
+      |        case _                            => Dist.Bot
+      |    }
+      |}
+      |
+      |def sum(e1: Dist, e2: Dist): Dist = match (e1, e2) {
+      |  case (Dist.Top, _)                => Dist.Top
+      |  case (_, Dist.Top)                => Dist.Top
+      |  case (Dist.Dst(n1), Dist.Dst(n2)) => Dist.Dst(n1 + n2)
+      |  case _                            => Dist.Bot
+      |}
+      |
+      |def negativeDist(d: Dist): Bool = match d {
+      |  case Dist.Top    => true
+      |  case Dist.Dst(x) => x < 0
+      |  case _           => false
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    let p = #{
+      |        ShortestDist(a, b; Dist.Dst(d)) :- Edge(a, b, d).
+      |        ShortestDist(a, c; sum(d1, d2)) :- ShortestDist(a, b; d1), ShortestDist(b, c; d2).
+      |        ShortestDist(a, a; Dist.Top) :- ShortestDist(a, a; d), if (negativeDist(d)).
+      |
+      |        Edge("a", "b", 1).
+      |        Edge("b", "c", 2).
+      |        Edge("c", "a", 3).
+      |        Edge("c", "d", 4).
+      |        Edge("d", "e", 7).
+      |        Edge("d", "f", 11).
+      |        Edge("f", "e", 23).
+      |
+      |        Edge("1", "2", -3).
+      |        Edge("2", "3", 1).
+      |        Edge("3", "1", 1).
+      |        Edge("3", "4", 30).
+      |    };
+      |    let res = query p select (x, y, z) from ShortestDist(x, y; z);
+      |    blackhole(res)
       |}
       |""".stripMargin
   }
