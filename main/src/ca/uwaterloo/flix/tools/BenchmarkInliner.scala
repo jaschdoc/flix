@@ -95,6 +95,7 @@ object BenchmarkInliner {
     "imperativeForLoops" -> imperativeForLoops,
     "internalMutability" -> internalMutability,
     "connectGraph" -> connectGraph,
+    "deliveryDate" -> deliveryDate,
   )
 
   /**
@@ -1038,6 +1039,36 @@ object BenchmarkInliner {
       |    let connectedGraph = connectGraph(graph);
       |    let result = query connectedGraph select (c1, c2) from Edge(c1, c2);
       |    result |> blackhole
+      |
+      |""".stripMargin
+  }
+
+  private def deliveryDate: String = {
+    """
+      |def runBenchmark(): Unit \ IO =
+      |    let p = #{
+      |        PartDepends("Car",       "Chassis").
+      |        PartDepends("Car",       "Engine").
+      |        PartDepends("Engine",    "Piston").
+      |        PartDepends("Engine",    "Ignition").
+      |
+      |        AssemblyTime("Car",     7).
+      |        AssemblyTime("Engine",  2).
+      |
+      |        DeliveryDate("Chassis";  2).
+      |        DeliveryDate("Piston";   1).
+      |        DeliveryDate("Ignition"; 7).
+      |
+      |        ReadyDate(part; date) :-
+      |            DeliveryDate(part; date).
+      |
+      |        ReadyDate(part; assemblyTime + componentDate) :-
+      |            PartDepends(part, component),
+      |            AssemblyTime(part, assemblyTime),
+      |            ReadyDate(component; componentDate).
+      |    };
+      |
+      |    query p select (c, d) from ReadyDate(c; d) |> Vector.toMap |> blackhole
       |
       |""".stripMargin
   }
