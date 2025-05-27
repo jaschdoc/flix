@@ -83,7 +83,7 @@ object BenchmarkInliner {
     "map10k" -> map10K,
     "filterMap10k" -> filterMap10K,
     "map10kOptimized" -> map10KOptimized,
-    "filterMap10kOptimized" -> filterMap10KOptimized
+    "filterMap10kOptimized" -> filterMap10KOptimized,
   )
 
   /**
@@ -104,7 +104,8 @@ object BenchmarkInliner {
     */
   private val MacroBenchmarks: Map[String, String] = Map(
     "FordFulkerson" -> fordFulkerson,
-    "Parsers" -> parsers
+    "Palindrome" -> palindrome,
+    "Parsers" -> parsers,
   )
 
   private def baseDir: Path = Path.of("./build/").normalize()
@@ -1069,6 +1070,48 @@ object BenchmarkInliner {
       |    };
       |
       |    query p select (c, d) from ReadyDate(c; d) |> Vector.toMap |> blackhole
+      |
+      |""".stripMargin
+  }
+
+  private def palindrome: String = {
+    """
+      |def runBenchmark(): Unit \ IO = {
+      |    def trial(input) = {
+      |        input |>
+      |        longestPalindromeSequence |>
+      |        Option.map(match (b,e) -> String.slice(start = b, end = e+1, input)) |>
+      |        Option.getWithDefault("nothing") |>
+      |        blackhole
+      |    };
+      |
+      |    trial("ABBAIsCool") |> blackhole;
+      |    trial("Hello") |> blackhole;
+      |    trial("YaddaYaddaYadda") |> blackhole;
+      |    trial("abammabba" |> blackhole
+      |}
+      |
+      |def longestPalindromeSequence(s: String): Option[(Int32, Int32)] = {
+      |    let length = String.length(s);
+      |    let sameChar = i -> j -> {
+      |        if (i >= 0 and j < length and i <= j)
+      |            String.charAt(i, s) == String.charAt(j, s)
+      |        else false
+      |    };
+      |    let indices = inject List.range(0, length) into StringIndex;
+      |    let p = #{
+      |        LongestPalindrome(i, i; 1) :- StringIndex(i).
+      |        LongestPalindrome(i, i+1; 2) :- StringIndex(i), if (sameChar(i, i+1)).
+      |        LongestPalindrome(b-1, e+1; l+2) :- if (b <= e and b-1 >= 0 and e+1 < length),
+      |            if (sameChar(b-1, e+1)), LongestPalindrome(b, e; l).
+      |    };
+      |    let solution = solve p <+> indices;
+      |    forM (
+      |        maxLength <- query solution select l from LongestPalindrome(_, _; l) |> Vector.maximum;
+      |        res <- query solution select (b, e) from LongestPalindrome(b,e;maxLength) |> Vector.head
+      |    ) yield res
+      |
+      |}
       |
       |""".stripMargin
   }
