@@ -94,6 +94,7 @@ object BenchmarkInliner {
     "mutualRecursion" -> mutualRecursion,
     "imperativeForLoops" -> imperativeForLoops,
     "internalMutability" -> internalMutability,
+    "connectGraph" -> connectGraph,
   )
 
   /**
@@ -996,6 +997,47 @@ object BenchmarkInliner {
       |def runBenchmark(): Unit \ IO =
       |    let l = 1 :: 1 :: 2 :: 2 :: 3 :: 3 :: Nil;
       |    deduplicate(l) |> blackhole
+      |
+      |""".stripMargin
+  }
+
+  private def connectGraph: String = {
+    """
+      |pub type alias Edge[node] = (node, node)
+      |
+      |pub type alias Graph[node] = {
+      |    nodes = Set[node],
+      |    edges = Set[Edge[node]]
+      |}
+      |
+      |pub def connectedComponentRep(g: Graph[node]): #{ ComponentRep(node, node) | r } with Order[node] =
+      |    let nodes = inject g#nodes into Node;
+      |    let edges = inject g#edges into Edge;
+      |    let reachability = #{
+      |        Reachable(n, n) :- Node(n).
+      |        Reachable(n1, n2) :- Edge(n1, n2).
+      |        Reachable(n1, n2) :- Edge(n2, n1).
+      |        Reachable(n1, n2) :- Reachable(n1, m), Reachable(m, n2).
+      |        ReachUp(n1) :- Reachable(n1, n2), if (n1 < n2).
+      |        ComponentRep(n, rep) :- Reachable(n, rep), not ReachUp(rep).
+      |    };
+      |    solve nodes, edges, reachability project ComponentRep
+      |
+      |pub def connectGraph(g: Graph[node]): #{ Edge(Set[node], Set[node]) | r } with Order[node] =
+      |    let missingEdges = #{
+      |        Component(rep; Set#{n}) :- ComponentRep(n, rep).
+      |        Edge(c1, c2) :- fix Component(_; c1), fix Component(_; c2), if (c1 < c2).
+      |    };
+      |    solve connectedComponentRep(g), missingEdges project Edge
+      |
+      |def runBenchmark(): Unit \ IO =
+      |    let graph = {
+      |        nodes = Set.range(0, 8),
+      |        edges = Set#{(0, 4), (0, 7), (2, 3), (1, 6), (5, 6)}
+      |    };
+      |    let connectedGraph = connectGraph(graph);
+      |    let result = query connectedGraph select (c1, c2) from Edge(c1, c2);
+      |    result |> blackhole
       |
       |""".stripMargin
   }
