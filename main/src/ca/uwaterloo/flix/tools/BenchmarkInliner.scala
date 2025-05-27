@@ -108,6 +108,7 @@ object BenchmarkInliner {
     "Palindrome" -> palindrome,
     "Parsers" -> parsers,
     "Sequence" -> sequence,
+    "SingleSourceShortestDistance" -> singleSourceShortestDistance,
     "SingleSourceShortestPaths" -> singleSourceShortestPaths,
   )
 
@@ -1797,6 +1798,37 @@ object BenchmarkInliner {
       |
       |    };
       |    query lp <+> numLetters select (x, y) from Read(x, y) |> blackhole
+      |}
+      |
+      |""".stripMargin
+  }
+
+  private def singleSourceShortestDistance: String = {
+    """
+      |mod ShortestDistance {
+      |
+      |    use Down.Down;
+      |
+      |    pub def sssd(src: t, g: m[(t, Int32, t)]): Map[t, Int32] \ Foldable.Aef[m] with Foldable[m], Order[t] = {
+      |        let edges = inject g into Edge;
+      |        let dists = #{
+      |            Dist(src; Down(0)).
+      |            Dist(y; d + Down(w)) :- Dist(x; d), Edge(x, w, y).
+      |        };
+      |        let res = query edges, dists select (x, coerce(d)) from Dist(x; d);
+      |        res |> Vector.toMap
+      |    }
+      |
+      |    pub def exampleGraph04(): Set[(Int32, Int32, Int32)] =
+      |        Set#{  (0, 10, 1), (0, 10, 4 ), (0, 10, 7 ), (1, 20, 2), (2, 5, 3),
+      |               (2, 10, 5), (3, 5 , 10), (4, 15, 1 ), (4, 20, 5), (5, 5, 7),
+      |               (5, 30, 6), (6, 2 , 9 ), (6, 5 , 2 ), (6, 20, 10), (7, 5 , 8),
+      |               (8, 5 , 6), (8, 10, 9 ), (9, 30, 10)
+      |            }
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    ShortestDistance.sssd(0, ShortestDistance.exampleGraph04()) |> blackhole
       |}
       |
       |""".stripMargin
