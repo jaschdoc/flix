@@ -74,9 +74,9 @@ object BenchmarkInliner {
     "Map.filter" -> mapFilter,
     "Map.foldLeft" -> mapFoldLeft,
     "Map.foldRight" -> mapFoldRight,
-    "Set.filter" -> setFilter,
-    "Set.foldLeft" -> setFoldLeft,
-    "Set.foldRight" -> setFoldRight,
+    "Set.filter" -> libSetFilter,
+    "Set.foldLeft" -> libSetFoldLeft,
+    "Set.foldRight" -> libSetFoldRight,
     "map10k" -> map10K,
     "filterMap10k" -> filterMap10K,
     "map10kOptimized" -> map10KOptimized,
@@ -847,7 +847,7 @@ object BenchmarkInliner {
       |""".stripMargin
   }
 
-  private def setFilter: String = {
+  private def libSetFilter: String = {
     """
       |pub def runBenchmark(): Unit \ IO = {
       |    Set.range(0, 100) |> Set.filter(x -> Int32.modulo(x, 2) == 0) |> blackhole
@@ -855,7 +855,7 @@ object BenchmarkInliner {
       |""".stripMargin
   }
 
-  private def setFoldLeft: String = {
+  private def libSetFoldLeft: String = {
     """
       |pub def runBenchmark(): Unit \ IO = {
       |    Set.range(0, 100) |> Set.foldLeft(Add.add, 0) |> blackhole
@@ -863,7 +863,7 @@ object BenchmarkInliner {
       |""".stripMargin
   }
 
-  private def setFoldRight: String = {
+  private def libSetFoldRight: String = {
     """
       |pub def runBenchmark(): Unit \ IO = {
       |    Set.range(0, 100) |> Set.foldRight(Add.add, 0) |> blackhole
