@@ -95,6 +95,7 @@ object BenchmarkInliner {
     "mutualRecursion" -> mutualRecursion,
     "imperativeForLoops" -> imperativeForLoops,
     "internalMutability" -> internalMutability,
+    "Introduction" -> introduction,
     "connectGraph" -> connectGraph,
     "deliveryDate" -> deliveryDate,
     "RailRoadNetwork" -> railRoadNetwork,
@@ -2094,6 +2095,130 @@ object BenchmarkInliner {
       |    let a = evalAExp(e);
       |    let b = evalInst(compileAExp(e), Nil);
       |    blackhole(a == b)
+      |}
+      |
+      |""".stripMargin
+  }
+
+  private def introduction: String = {
+    """
+      |enum LocalVar({k = String, v = Constant})
+      |
+      |enum Constant {
+      |      case Top,
+      |    case Cst(Int32),
+      |      case Bot
+      |}
+      |
+      |instance LowerBound[Constant] {
+      |    pub def minValue(): Constant = Constant.Bot
+      |}
+      |
+      |instance Eq[Constant] {
+      |    pub def eq(x: Constant, y: Constant): Bool = match (x, y) {
+      |        case (Constant.Top, Constant.Top)       => true
+      |        case (Constant.Cst(a), Constant.Cst(b)) => a == b
+      |        case (Constant.Bot, Constant.Bot)       => true
+      |        case _                                  => false
+      |    }
+      |}
+      |
+      |instance PartialOrder[Constant] {
+      |    pub def lessEqual(e1: Constant, e2: Constant): Bool = match (e1, e2) {
+      |        case (Constant.Bot, _)                    => true
+      |        case (Constant.Cst(n1), Constant.Cst(n2)) => n1 == n2
+      |        case (_, Constant.Top)                    => true
+      |        case _                                    => false
+      |    }
+      |}
+      |
+      |instance JoinLattice[Constant] {
+      |    pub def leastUpperBound(x: Constant, y: Constant): Constant = match (x, y) {
+      |        case (Constant.Bot, _)                    => y
+      |        case (_, Constant.Bot)                    => x
+      |        case (Constant.Cst(n1), Constant.Cst(n2)) => if (n1 == n2) x else Constant.Top
+      |        case _                                    => Constant.Top
+      |    }
+      |}
+      |
+      |instance MeetLattice[Constant] {
+      |    pub def greatestLowerBound(e1: Constant, e2: Constant): Constant = match (e1, e2) {
+      |        case (Constant.Top, x)                    => x
+      |        case (x, Constant.Top)                    => x
+      |        case (Constant.Cst(n1), Constant.Cst(n2)) => if (n1 == n2) e1 else Constant.Bot
+      |        case _                                    => Constant.Bot
+      |    }
+      |}
+      |
+      |instance Order[Constant] {
+      |    pub def compare(x: Constant, y: Constant): Comparison = match (x, y) {
+      |        case (Constant.Bot, Constant.Bot)         => Comparison.EqualTo
+      |        case (Constant.Bot, Constant.Cst(_))      => Comparison.LessThan
+      |        case (Constant.Bot, Constant.Top)         => Comparison.LessThan
+      |        case (Constant.Cst(_), Constant.Bot)      => Comparison.GreaterThan
+      |        case (Constant.Cst(v1), Constant.Cst(v2)) => v1 <=> v2
+      |        case (Constant.Cst(_), Constant.Top)      => Comparison.LessThan
+      |        case (Constant.Top, Constant.Bot)         => Comparison.GreaterThan
+      |        case (Constant.Top, Constant.Cst(_))      => Comparison.GreaterThan
+      |        case (Constant.Top, Constant.Top)         => Comparison.EqualTo
+      |    }
+      |}
+      |
+      |instance ToString[Constant] {
+      |    pub def toString(x: Constant): String = match x {
+      |        case Constant.Top    => "Constant.Top"
+      |        case Constant.Cst(n) => "Constant.Cst(${n})"
+      |        case Constant.Bot    => "Constant.Bot"
+      |    }
+      |}
+      |
+      |def alpha(i: Int32): Constant = Constant.Cst(i)
+      |
+      |def sum(e1: Constant, e2: Constant): Constant = match (e1, e2) {
+      |    case (Constant.Bot, _)                    => Constant.Bot
+      |    case (_, Constant.Bot)                    => Constant.Bot
+      |    case (Constant.Cst(n1), Constant.Cst(n2)) => Constant.Cst(n1 + n2)
+      |    case _                                    => Constant.Top
+      |}
+      |
+      |def div(e1: Constant, e2: Constant): Constant = match (e1, e2) {
+      |    case (_, Constant.Bot)                    => Constant.Bot
+      |    case (Constant.Bot, _)                    => Constant.Bot
+      |    case (Constant.Cst(n1), Constant.Cst(n2)) => if (n2 == 0) Constant.Bot else Constant.Cst(n1 / n2)
+      |    case _                                    => Constant.Top
+      |}
+      |
+      |def isMaybeZero(e: Constant): Bool = match e {
+      |    case Constant.Bot    => false
+      |    case Constant.Cst(n) => n == 0
+      |    case Constant.Top    => true
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    let p = #{
+      |        LocalVar(r; alpha(c)) :- LitStm(r, c).
+      |        LocalVar(r; sum(v1, v2)) :- AddStm(r, x, y),
+      |                                    LocalVar(x; v1),
+      |                                    LocalVar(y; v2).
+      |
+      |        LocalVar(r; div(v1, v2)) :- DivStm(r, x, y),
+      |                                    LocalVar(x; v1),
+      |                                    LocalVar(y; v2).
+      |
+      |        ArithmeticError(r) :- DivStm(r, _n, d),
+      |                              LocalVar(d; y),
+      |                              if (isMaybeZero(y)).
+      |
+      |        LitStm("x", 3).        // x = 3
+      |        LitStm("y", 7).        // y = 7
+      |        LitStm("z", 0).        // z = 0
+      |        AddStm("w", "x", "y"). // w = x + y
+      |        DivStm("v", "w", "z"). // v = w / z
+      |    };
+      |    let vars = query p select (a, b) from LocalVar(a; b);
+      |    let errs = query p select r from ArithmeticError(r);
+      |    blackhole(vars);
+      |    blackhole(errs)
       |}
       |
       |""".stripMargin
