@@ -99,6 +99,7 @@ object BenchmarkInliner {
     "deliveryDate" -> deliveryDate,
     "RailRoadNetwork" -> railRoadNetwork,
     "TopSort" -> topSort,
+    "TwoSat" -> twoSat,
   )
 
   /**
@@ -1138,6 +1139,49 @@ object BenchmarkInliner {
       |
       |    query lp <+> edges select (x, i) from Index(x, i) |> blackhole
       |}
+      |""".stripMargin
+  }
+
+  private def twoSat: String = {
+    """
+      |def runBenchmark(): Unit \ IO = {
+      |    let clauses = #{
+      |        Clause("Pos", "x0", "Pos", "x2").
+      |        Clause("Pos", "x0", "Neg", "x3").
+      |        Clause("Pos", "x2", "Neg", "x3").
+      |        Clause("Pos", "x1", "Neg", "x4").
+      |        Clause("Neg", "x2", "Neg", "x4").
+      |        Clause("Neg", "x0", "Neg", "x5").
+      |        Clause("Neg", "x1", "Neg", "x5").
+      |        Clause("Neg", "x2", "Neg", "x5").
+      |        Clause("Pos", "x3", "Pos", "x6").
+      |        Clause("Pos", "x4", "Pos", "x6").
+      |        Clause("Pos", "x5", "Pos", "x6").
+      |        Clause("Pos", "x6", "Neg", "x2").
+      |        Clause("Neg", "x6", "Pos", "x2").
+      |        Clause("Neg", "x6", "Neg", "x2").
+      |    };
+      |
+      |    let lp = #{
+      |        AnyIncon() :- Incon(_).
+      |
+      |        Not("Pos", "Neg").
+      |        Not("Neg", "Pos").
+      |
+      |        Impl(m, u, n, v) :- Not(m, p), Clause(p, u, n, v).
+      |        Impl(m, u, n, v) :- Not(m, p), Clause(n, v, p, u).
+      |
+      |        Impl(m, u, n, v) :- Impl(m, u, p, w), Impl(p, w, n, v).
+      |
+      |        Incon(u) :- Impl("Pos", u, "Neg", u), Impl("Neg", u, "Pos", u).
+      |
+      |        Satisfiable("Yes") :- not AnyIncon().
+      |        Satisfiable("No") :- AnyIncon().
+      |    };
+      |
+      |    query lp <+> clauses select x from Satisfiable(x) |> blackhole
+      |}
+      |
       |""".stripMargin
   }
 
