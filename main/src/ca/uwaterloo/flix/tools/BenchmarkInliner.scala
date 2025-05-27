@@ -48,17 +48,15 @@ object BenchmarkInliner {
 
   }
 
-  private val RunningTimeWarmupTime: Int = 5
+  private val RunningTimeWarmupTime: Int = 10
 
-  private val RunningTimeBenchmarkTime: Int = 5
+  private val RunningTimeBenchmarkTime: Int = 10
 
-  private val CompilationWarmupTime: Int = 0
+  private val CompilationWarmupTime: Int = 10
 
-  private val CompilationBenchmarkTime: Int = 2
+  private val CompilationBenchmarkTime: Int = 10
 
-  private val MaxInliningRounds: Int = 5
-
-  private val NumberOfRuns: Int = 1000
+  private val NumberOfRuns: Int = 100_000
 
   /**
     * Set this to `true` for additional details during benchmarking.
@@ -113,14 +111,7 @@ object BenchmarkInliner {
   def generateSetup(opts: Options, suite: Suite, asprofPath: Option[String]): Unit = {
     println("Generating setup...")
 
-    // TODO: Maybe pass this as a program config to the run instance
-    // TODO: Then create public pre-made configs in this object
-    val programs = suite match {
-      case Suite.Micro => MicroBenchmarks
-      case Suite.Medium => ???
-      case Suite.Macro => MacroBenchmarks
-      case Suite.All => MicroBenchmarks ++ MacroBenchmarks
-    }
+    val programs = programsFromSuite(suite)
 
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
@@ -156,20 +147,10 @@ object BenchmarkInliner {
   }
 
   def runCompilerBenchmark(opts: Options, suite: Suite): Unit = {
-    val programs = suite match {
-      case Suite.Micro => MicroBenchmarks
-      case Suite.Medium => ???
-      case Suite.Macro => MacroBenchmarks
-      case Suite.All => ???
-    }
-    val outFileName = suite match {
-      case Suite.Micro => "micro.json"
-      case Suite.Medium => ???
-      case Suite.Macro => "macro.json"
-      case Suite.All => ???
-    }
+    val programs = programsFromSuite(suite)
+    val outFileName = outFileFromSuite(suite)
 
-    println("Benchmarking inliner compilation...")
+    println("Benchmarking compilation...")
     val t0 = System.nanoTime()
     val benchmarks = runBenchmarking(programs, opts)
     val filePath = benchOutputPath.resolve(outFileName).normalize()
@@ -180,6 +161,24 @@ object BenchmarkInliner {
     val tDelta = System.nanoTime() - t0
     val seconds = nanosToMinutes(tDelta)
     println(s"Took $seconds minutes total")
+  }
+
+  private def outFileFromSuite(suite: Suite): String = {
+    suite match {
+      case Suite.Micro => "micro.json"
+      case Suite.Medium => "medium.json"
+      case Suite.Macro => "macro.json"
+      case Suite.All => "all.json"
+    }
+  }
+
+  private def programsFromSuite(suite: Suite): Map[String, String] = {
+    suite match {
+      case Suite.Micro => MicroBenchmarks
+      case Suite.Medium => MediumBenchmarks
+      case Suite.Macro => MacroBenchmarks
+      case Suite.All => MicroBenchmarks ++ MediumBenchmarks ++ MacroBenchmarks
+    }
   }
 
   private def debug(s: String): Unit = {
@@ -282,19 +281,22 @@ object BenchmarkInliner {
   private def snd[A, B](x: (A, B)): B = x._2
 
   private def estimateTimeMinutes(programsCount: Int, warmupTime: Int, benchmarkTime: Int): Int = {
-    val timeCalc = (time: Int) => {
-      val allProgsTime = time * programsCount
-      val withInlining = allProgsTime * MaxInliningRounds
-      val withoutInlining = allProgsTime
-      withInlining + withoutInlining
-    }
+    val timeCalc = (time: Int) => time * programsCount * 2
     timeCalc(warmupTime) + timeCalc(benchmarkTime)
+  }
+
+  private def programSuiteFromProgram(progName: String): String = {
+    if (MicroBenchmarks.contains(progName))
+      "micro"
+    else if (MediumBenchmarks.contains(progName))
+      "medium"
+    else
+      "macro"
   }
 
   private def runBenchmarking(programs: Map[String, String], opts: Options): JsonAST.JObject = {
     val totalTime = estimateTimeMinutes(programs.size, CompilationWarmupTime, CompilationBenchmarkTime)
     debug(s"Programs        : ${programs.size}")
-    debug(s"Rounds          : $MaxInliningRounds")
     debug(s"Warmup          : $CompilationWarmupTime minutes")
     debug(s"Bench           : $CompilationBenchmarkTime minutes")
     debug(s"Total (Compiler): $totalTime minutes")
@@ -322,7 +324,7 @@ object BenchmarkInliner {
                     ("average" -> stats.average) ~
                     ("median" -> stats.median)
                 }
-              }) ~
+              }) ~ ("suite" -> programSuiteFromProgram(name)) ~
                 ("results" -> runs.map(_.toJson))
             }
         }
