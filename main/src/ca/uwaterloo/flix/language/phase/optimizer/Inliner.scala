@@ -69,8 +69,8 @@ import scala.jdk.CollectionConverters.ConcurrentMapHasAsScala
 object Inliner {
 
   /** Performs inlining on the given AST `root`. */
-  def run(root: MonoAst.Root, delta: Set[Symbol.DefnSym])(implicit flix: Flix): (MonoAst.Root, Set[Symbol.DefnSym]) = {
-    val sctx: SharedContext = SharedContext.mk(delta)
+  def run(root: MonoAst.Root)(implicit flix: Flix): (MonoAst.Root, Set[Symbol.DefnSym]) = {
+    val sctx: SharedContext = SharedContext.mk()
     val defs = ParOps.parMapValues(root.defs)(visitDef(_)(sctx, root, flix))
     val newDelta = sctx.changed.asScala.keys.toSet
     val liveSyms = root.entryPoints ++ sctx.live.asScala.keys.toSet
@@ -297,15 +297,14 @@ object Inliner {
       Expr.Scope(freshVarSym, rvar, e, tpe, eff, loc)
 
     case Expr.IfThenElse(exp1, exp2, exp3, tpe, eff, loc) =>
-      val e1 = visitExp(exp1, ctx0)
-      e1 match {
+      visitExp(exp1, ctx0) match {
         case Expr.Cst(Constant.Bool(true), _, _) =>
           sctx.changed.putIfAbsent(sym0, ())
           visitExp(exp2, ctx0)
         case Expr.Cst(Constant.Bool(false), _, _) =>
           sctx.changed.putIfAbsent(sym0, ())
           visitExp(exp3, ctx0)
-        case _ =>
+        case e1 =>
           val e2 = visitExp(exp2, ctx0)
           val e3 = visitExp(exp3, ctx0)
           Expr.IfThenElse(e1, e2, e3, tpe, eff, loc)
@@ -328,9 +327,17 @@ object Inliner {
       Expr.Discard(e, eff, loc)
 
     case Expr.Match(exp, rules, tpe, eff, loc) =>
-      val rs = rules.map(visitMatchRule(_, ctx0))
       val e = visitExp(exp, ctx0)
+      val rs = rules.map(visitMatchRule(_, ctx0))
       Expr.Match(e, rs, tpe, eff, loc)
+
+    case Expr.ExtensibleMatch(label, exp1, sym2, exp2, sym3, exp3, tpe, eff, loc) =>
+      val freshVarSym2 = Symbol.freshVarSym(sym2)
+      val freshVarSym3 = Symbol.freshVarSym(sym3)
+      val e1 = visitExp(exp1, ctx0)
+      val e2 = visitExp(exp2, ctx0.addVarSubst(sym2, freshVarSym2).addInScopeVar(freshVarSym2, BoundKind.ParameterOrPattern))
+      val e3 = visitExp(exp3, ctx0.addVarSubst(sym3, freshVarSym3).addInScopeVar(freshVarSym3, BoundKind.ParameterOrPattern))
+      Expr.ExtensibleMatch(label, e1, freshVarSym2, e2, freshVarSym3, e3, tpe, eff, loc)
 
     case Expr.VectorLit(exps, tpe, eff, loc) =>
       val es = exps.map(visitExp(_, ctx0))
@@ -355,8 +362,8 @@ object Inliner {
       Expr.TryCatch(e, rs, tpe, eff, loc)
 
     case Expr.RunWith(exp, effUse, rules, tpe, eff, loc) =>
-      val rs = rules.map(visitHandlerRule(_, ctx0))
       val e = visitExp(exp, ctx0)
+      val rs = rules.map(visitHandlerRule(_, ctx0))
       Expr.RunWith(e, effUse, rs, tpe, eff, loc)
 
     case Expr.Do(op, exps, tpe, eff, loc) =>
@@ -491,10 +498,24 @@ object Inliner {
     * @param exps the arguments to the function.
     * @param ctx0 the local context.
     */
-  private def shouldInlineDef(defn: MonoAst.Def, exps: List[Expr], ctx0: LocalContext)(implicit sctx: SharedContext): Boolean = {
-    !sctx.delta.contains(defn.sym) &&
-      !ctx0.currentlyInlining &&
-      !defn.spec.defContext.isSelfRef &&
+  private def shouldInlineDef(defn: MonoAst.Def, exps: List[Expr], ctx0: LocalContext)(implicit sym0: Symbol.DefnSym): Boolean = {
+    if (ctx0.currentlyInlining) {
+      return false
+    }
+
+    if (defn.spec.ann.isDontInline) {
+      return false
+    }
+
+    if (defn.spec.ann.isInline) {
+      if (defn.sym == sym0) {
+        return false
+      }
+
+      return true
+    }
+
+    !defn.spec.defContext.isSelfRef &&
       (isSingleAction(defn.exp) || isSimple(defn.exp) || hasKnownLambda(exps))
   }
 
@@ -707,21 +728,20 @@ object Inliner {
   }
 
   private object SharedContext {
+
     /**
       * Returns a fresh [[SharedContext]].
-      *
-      * The delta set does not change during the lifetime of the shared context.
       */
-    def mk(delta: Set[Symbol.DefnSym]): SharedContext = new SharedContext(delta, new ConcurrentHashMap(), new ConcurrentHashMap())
+    def mk(): SharedContext = new SharedContext(new ConcurrentHashMap(), new ConcurrentHashMap())
+
   }
 
   /**
     * A globally shared thread-safe context.
     *
-    * @param delta   the set of symbols that changed in the last iteration.
     * @param changed the set of symbols of changed functions.
     * @param live    the set of symbols of live functions.
     */
-  private case class SharedContext(delta: Set[Symbol.DefnSym], changed: ConcurrentHashMap[Symbol.DefnSym, Unit], live: ConcurrentHashMap[Symbol.DefnSym, Unit])
+  private case class SharedContext(changed: ConcurrentHashMap[Symbol.DefnSym, Unit], live: ConcurrentHashMap[Symbol.DefnSym, Unit])
 
 }

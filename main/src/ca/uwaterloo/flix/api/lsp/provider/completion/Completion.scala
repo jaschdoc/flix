@@ -32,21 +32,20 @@ sealed trait Completion {
     */
   def toCompletionItem(implicit flix: Flix): CompletionItem = this match {
 
-    case Completion.KeywordCompletion(name, range, priority) =>
+    case Completion.AnnotationCompletion(name, range, priority) =>
+      CompletionItem(
+        label    = "@" + name,
+        sortText = Priority.toSortText(priority, name),
+        textEdit = TextEdit(range, "@" + name),
+        kind     = CompletionItemKind.Constant
+      )
+
+    case Completion.KeywordCompletion(name, range, priority, withSpace) =>
       CompletionItem(
         label    = name,
         sortText = Priority.toSortText(priority, name),
-        textEdit = TextEdit(range, s"$name "),
+        textEdit = TextEdit(range, if (withSpace) name + " " else name),
         kind     = CompletionItemKind.Keyword
-      )
-
-    case Completion.KeywordLiteralCompletion(name, range, priority) =>
-      CompletionItem(
-        label            = name,
-        sortText         = Priority.toSortText(priority, name),
-        textEdit         = TextEdit(range, name),
-        insertTextFormat = InsertTextFormat.PlainText,
-        kind             = CompletionItemKind.Keyword
       )
 
     case Completion.KindCompletion(kind, range) =>
@@ -537,36 +536,25 @@ sealed trait Completion {
 object Completion {
 
   /**
+    * Represents an annotation completion.
+    *
+    * @param name      the name of the annotation.
+    * @param range     the range of the completion.
+    * @param priority  the priority of the completion.
+    */
+  case class AnnotationCompletion(name: String, range: Range, priority: Priority) extends Completion
+
+  /**
     * Represents a keyword completion.
     *
     * @param name      the name of the keyword.
     * @param range     the range of the completion.
-    * @param priority  the completion priority of the keyword.
+    * @param priority  the priority of the completion.
+    * @param withSpace whether the completion should be followed by a space.
     */
-  case class KeywordCompletion(name: String, range: Range, priority: Priority) extends Completion
-
-  /**
-    * Represents a keyword literal completion (i.e. `true`).
-    *
-    * The reason we differentiate bewteen normal keywords and these literals
-    * is because completions for the former should include a trailing space
-    * whereas completions for the latter we might not want one.
-    *
-    * To illustrate this consider the two following correct completions (where ˽ denotes a space)
-    *
-    * `de`      --->    `def˽`
-    * `f(fal)`  --->    `f(false)`
-    *
-    * After the keyword `def` we *always* want a space but if we were
-    * to add a trailing space after `false` we would get the unnatural completion
-    *
-    * `f(fal)`  --->    `f(false˽)`
-    *
-    * @param literal   the literal keyword text.
-    * @param range     the range of the completion.
-    * @param priority  the priority of the keyword.
-    */
-  case class KeywordLiteralCompletion(literal: String, range: Range, priority: Priority) extends Completion
+  case class KeywordCompletion(name: String, range: Range, priority: Priority, withSpace: Boolean = true) extends Completion {
+    override def toString: String = s"KeywordCompletion($name, $priority, $range)"
+  }
 
   /**
     * Represents a completion for a kind.
@@ -624,7 +612,9 @@ object Completion {
     * @param labelDetails  to show the namespace of class we are going to import
     * @param priority      the priority of the completion.
     */
-  case class AutoImportCompletion(name:String, qualifiedName: String, range: Range, ap: AnchorPosition, labelDetails: CompletionItemLabelDetails, priority: Priority) extends Completion
+  case class AutoImportCompletion(name: String, qualifiedName: String, range: Range, ap: AnchorPosition, labelDetails: CompletionItemLabelDetails, priority: Priority) extends Completion {
+    override def toString: String = s"AutoImportCompletion($name, $qualifiedName, $priority, $range)"
+  }
 
   /**
     * Represents a Snippet completion
@@ -652,7 +642,9 @@ object Completion {
     * @param name the name of the variable to complete.
     * @param range the range of the completion.
     */
-  case class LocalVarCompletion(name: String, range: Range) extends Completion
+  case class LocalVarCompletion(name: String, range: Range) extends Completion {
+    override def toString: String = s"LocalVarCompletion($name, $range)"
+  }
 
   /**
     * Represents a Java Class completion
@@ -682,7 +674,9 @@ object Completion {
     * @param inScope   indicate whether to the def is inScope.
     * @param ectx      the expression context.
     */
-  case class DefCompletion(decl: TypedAst.Def, range: Range, ap: AnchorPosition, qualified:Boolean, inScope: Boolean, ectx: ExprContext) extends Completion
+  case class DefCompletion(decl: TypedAst.Def, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean, ectx: ExprContext) extends Completion {
+    override def toString: String = s"DefCompletion(${decl.sym}, $range)"
+  }
 
   /**
     * Represents an Enum completion
@@ -766,7 +760,7 @@ object Completion {
   /**
     * Represents an Op completion
     *
-    * @param op         the op.
+    * @param decl       the operation declaration.
     * @param namespace  the namespace of the op, if not provided, we use the fully qualified name.
     * @param range      the range of the completion.
     * @param ap         the anchor position for the use statement.
@@ -774,7 +768,9 @@ object Completion {
     * @param inScope    indicate whether to the op is inScope.
     * @param ectx       the expression context.
     */
-  case class OpCompletion(op: TypedAst.Op, namespace: String, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean, ectx: ExprContext) extends Completion
+  case class OpCompletion(decl: TypedAst.Op, namespace: String, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean, ectx: ExprContext) extends Completion {
+    override def toString: String = s"OpCompletion(${decl.sym}, $range)"
+  }
 
   /**
     * Represents an Op Handler completion
@@ -787,7 +783,7 @@ object Completion {
   /**
     * Represents a Signature completion
     *
-    * @param sig        the signature.
+    * @param decl       the signature declaration.
     * @param namespace  the namespace of the signature, if not provided, we use the fully qualified name.
     * @param range      the range of the completion.
     * @param ap         the anchor position for the use statement.
@@ -795,7 +791,9 @@ object Completion {
     * @param inScope    indicate whether to the signature is inScope.
     * @param ectx       the expression context.
     */
-  case class SigCompletion(sig: TypedAst.Sig, namespace: String, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean, ectx: ExprContext) extends Completion
+  case class SigCompletion(decl: TypedAst.Sig, namespace: String, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean, ectx: ExprContext) extends Completion {
+    override def toString: String = s"SigCompletion(${decl.sym}, $range)"
+  }
 
   /**
     * Represents an Enum Tag completion
@@ -819,7 +817,9 @@ object Completion {
     * @param qualified  indicate whether to use a qualified label.
     * @param inScope    indicate whether to the signature is inScope.
     */
-  case class ModuleCompletion(module: Symbol.ModuleSym, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean) extends Completion
+  case class ModuleCompletion(module: Symbol.ModuleSym, range: Range, ap: AnchorPosition, qualified: Boolean, inScope: Boolean) extends Completion {
+    override def toString: String = s"ModuleCompletion($module, $range)"
+  }
 
   /**
     * Represents a Use completion.

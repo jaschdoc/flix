@@ -16,6 +16,7 @@
 
 package ca.uwaterloo.flix.language.phase.jvm
 
+import ca.uwaterloo.flix.language.ast.SourceLocation
 import ca.uwaterloo.flix.language.phase.jvm.BytecodeInstructions.Branch.{FalseBranch, TrueBranch}
 import ca.uwaterloo.flix.language.phase.jvm.ClassMaker.*
 import ca.uwaterloo.flix.language.phase.jvm.JvmName.MethodDescriptor
@@ -33,6 +34,9 @@ object BytecodeInstructions {
   sealed class F(visitor: MethodVisitor) {
     def visitTypeInstruction(opcode: Int, tpe: JvmName): Unit =
       visitor.visitTypeInsn(opcode, tpe.toInternalName)
+
+    def visitTypeInstructionDirect(opcode: Int, tpe: String): Unit =
+      visitor.visitTypeInsn(opcode, tpe)
 
     def visitInstruction(opcode: Int): Unit = visitor.visitInsn(opcode)
 
@@ -55,8 +59,14 @@ object BytecodeInstructions {
     def visitLabel(label: Label): Unit =
       visitor.visitLabel(label)
 
+    def visitLineNumber(line: Int, label: Label): Unit =
+      visitor.visitLineNumber(line, label)
+
     def visitLoadConstantInstruction(v: Any): Unit =
       visitor.visitLdcInsn(v)
+
+    def visitIntInstruction(opcode: Int, v: Int): Unit =
+      visitor.visitIntInsn(opcode, v)
 
     def visitTryCatchBlock(beforeTry: Label, afterTry: Label, handlerStart: Label): Unit =
       visitor.visitTryCatchBlock(beforeTry, afterTry, handlerStart, null)
@@ -177,6 +187,11 @@ object BytecodeInstructions {
 
   def ATHROW(): InstructionSet = f => {
     f.visitInstruction(Opcodes.ATHROW)
+    f
+  }
+
+  def BIPUSH(i: Byte): InstructionSet = f => {
+    f.visitIntInstruction(Opcodes.BIPUSH, i)
     f
   }
 
@@ -463,6 +478,11 @@ object BytecodeInstructions {
     f
   }
 
+  def SIPUSH(i: Short): InstructionSet = f => {
+    f.visitIntInstruction(Opcodes.SIPUSH, i)
+    f
+  }
+
   def SWAP(): InstructionSet = f => {
     f.visitInstruction(Opcodes.SWAP)
     f
@@ -471,6 +491,13 @@ object BytecodeInstructions {
   //
   // ~~~~~~~~~~~~~~~~~~~~~~~~~ Meta JVM Instructions ~~~~~~~~~~~~~~~~~~~~~~~~~~
   //
+
+  def addLoc(loc: SourceLocation): InstructionSet = f => {
+    val label = new Label()
+    f.visitLabel(label)
+    f.visitLineNumber(loc.beginLine, label)
+    f
+  }
 
   def branch(c: Condition)(cases: Branch => InstructionSet): InstructionSet = f0 => {
     var f = f0
@@ -485,6 +512,17 @@ object BytecodeInstructions {
     f = cases(TrueBranch)(f)
     f.visitLabel(skipLabel)
     f
+  }
+
+  def castIfNotPrim(tpe: BackendType): InstructionSet = {
+    tpe match {
+      case arr: BackendType.Array => f => {
+        f.visitTypeInstructionDirect(Opcodes.CHECKCAST, arr.toDescriptor)
+        f
+      }
+      case BackendType.Reference(ref) => CHECKCAST(ref.jvmName)
+      case _: BackendType.PrimitiveType => nop()
+    }
   }
 
   def cheat(command: MethodVisitor => Unit): InstructionSet = f => {
@@ -574,6 +612,22 @@ object BytecodeInstructions {
   def pushString(s: String): InstructionSet = f => {
     f.visitLoadConstantInstruction(s)
     f
+  }
+
+  def pushInt(i: Int): InstructionSet = i match {
+    case -1 => ICONST_M1()
+    case 0 => ICONST_0()
+    case 1 => ICONST_1()
+    case 2 => ICONST_2()
+    case 3 => ICONST_3()
+    case 4 => ICONST_4()
+    case 5 => ICONST_5()
+    case _ if scala.Byte.MinValue <= i && i <= scala.Byte.MaxValue => BIPUSH(i.toByte)
+    case _ if scala.Short.MinValue <= i && i <= scala.Short.MaxValue => SIPUSH(i.toByte)
+    case _ => f => {
+      f.visitLoadConstantInstruction(i)
+      f
+    }
   }
 
   def storeWithName(index: Int, tpe: BackendType)(body: Variable => InstructionSet): InstructionSet =
@@ -733,7 +787,7 @@ object BytecodeInstructions {
       */
     def mkString(prefix: Option[InstructionSet], suffix: Option[InstructionSet], length: Int, getNthString: Int => InstructionSet): InstructionSet = {
       // [] --> [new String[length]] // Referred to as `elms`.
-      cheat(mv => GenExpression.compileInt(length)(mv)) ~ ANEWARRAY(BackendObjType.String.jvmName) ~
+      pushInt(length) ~ ANEWARRAY(BackendObjType.String.jvmName) ~
       // [elms] --> [elms, -1] // Running index referred to as `i`.
       ICONST_M1() ~
       // [elms, -1] --> [elms, length]
