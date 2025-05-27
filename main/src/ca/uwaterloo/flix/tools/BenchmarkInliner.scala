@@ -71,12 +71,12 @@ object BenchmarkInliner {
     "List.length" -> listLength,
     "List.reverse" -> listReverse,
     "List.filterMap" -> listFilterMap,
-    "Map.filter" -> ???,
-    "Map.foldLeft" -> ???,
-    "Map.foldRight" -> ???,
-    "Set.filter" -> ???,
-    "Set.foldLeft" -> ???,
-    "Set.foldRight" -> ???,
+    "Map.filter" -> mapFilter,
+    "Map.foldLeft" -> mapFoldLeft,
+    "Map.foldRight" -> mapFoldRight,
+    "Set.filter" -> setFilter,
+    "Set.foldLeft" -> setFoldLeft,
+    "Set.foldRight" -> setFoldRight,
     "map10k" -> map10K,
     "filterMap10k" -> filterMap10K,
     "map10kOptimized" -> map10KOptimized,
@@ -561,6 +561,10 @@ object BenchmarkInliner {
        |    nanos / 1_000_000_000i64
        |}
        |
+       |pub def blackhole(t: a): Unit \\ IO =
+       |    Ref.fresh(Static, t); ()
+       |
+       |
        |def toJSON(samples: List[Int64]): JSON = {
        |    JSON.Obj(
        |        List#{
@@ -635,10 +639,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.filter(x -> Int32.modulo(x, 2) == 0) |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -647,10 +647,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.foldLeft(Add.add, 0) |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -659,10 +655,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.foldRight(Add.add, 0) |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -671,10 +663,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.map(x -> x + 1) |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -683,10 +671,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.length |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -695,10 +679,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.reverse |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -707,10 +687,6 @@ object BenchmarkInliner {
       |pub def runBenchmark(): Unit \ IO = {
       |    List.range(0, 10_000) |> List.filterMap(x -> if (Int32.remainder(x, 2) == 0) Some(x) else None) |> blackhole
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -751,10 +727,6 @@ object BenchmarkInliner {
       |    };
       |    len(l, 0)
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -785,10 +757,6 @@ object BenchmarkInliner {
       |}
       |
       |pub def rng(i: Int32, acc: List[Int32]): List[Int32] = if (i < 0) acc else rng(i - 1, i :: acc)
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -823,10 +791,6 @@ object BenchmarkInliner {
       |    def rng(i, acc) = if (i < bot) acc else rng(i - 1, i :: acc);
       |    rng(top - 1, Nil)
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
 
   }
@@ -856,10 +820,54 @@ object BenchmarkInliner {
       |}
       |
       |pub def rng(i: Int32, acc: List[Int32]): List[Int32] = if (i < 0) acc else rng(i - 1, i :: acc)
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
+      |""".stripMargin
+  }
+
+  private def mapFilter: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO = {
+      |    List.range(0, 100) |> List.toMapWith(k -> k) |> Map.filter(x -> Int32.modulo(x, 2) == 0) |> blackhole
+      |}
+      |""".stripMargin
+  }
+
+  private def mapFoldLeft: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO = {
+      |    List.range(0, 100) |> List.toMapWith(k -> k) |> Map.foldLeft(Add.add, 0) |> blackhole
+      |}
+      |""".stripMargin
+  }
+
+  private def mapFoldRight: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO = {
+      |    List.range(0, 100) |> List.toMapWith(k -> k) |> Map.foldRight(Add.add, 0) |> blackhole
+      |}
+      |""".stripMargin
+  }
+
+  private def setFilter: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO = {
+      |    Set.range(0, 100) |> Set.filter(x -> Int32.modulo(x, 2) == 0) |> blackhole
+      |}
+      |""".stripMargin
+  }
+
+  private def setFoldLeft: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO = {
+      |    Set.range(0, 100) |> Set.foldLeft(Add.add, 0) |> blackhole
+      |}
+      |""".stripMargin
+  }
+
+  private def setFoldRight: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO = {
+      |    Set.range(0, 100) |> Set.foldRight(Add.add, 0) |> blackhole
+      |}
       |""".stripMargin
   }
 
@@ -1087,10 +1095,6 @@ object BenchmarkInliner {
       |        Set#{ (0, 10, 1), (0, 10, 3), (1, 2, 3), (1, 4, 2), (1, 8, 4), (2, 10, 5), (3, 9, 4), (4, 6, 2), (4, 10, 5) }
       |
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
@@ -1399,10 +1403,6 @@ object BenchmarkInliner {
       |        ECons(fst(xs), snd(xs))
       |
       |}
-      |
-      |def blackhole(t: a): Unit \ IO =
-      |    Ref.fresh(Static, t); ()
-      |
       |""".stripMargin
   }
 
