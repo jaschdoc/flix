@@ -92,6 +92,7 @@ object BenchmarkInliner {
     */
   private val MediumBenchmarks: Map[String, String] = Map(
     "mutualRecursion" -> mutualRecursion,
+    "imperativeForLoops" -> imperativeForLoops,
   )
 
   /**
@@ -893,6 +894,84 @@ object BenchmarkInliner {
       |
       |def runBenchmark(): Unit \ IO =
       |    isOdd(12345) |> blackhole
+      |""".stripMargin
+  }
+
+  private def imperativeForLoops: String = {
+    """
+      |def runBenchmark(): Unit \ IO = region rc {
+      |    let l = 1 :: 2 :: 3 :: Nil;
+      |
+      |    foreach (x <- l)
+      |        blackhole(x);
+      |
+      |    let z = Ref.fresh(rc, Nil);
+      |    foreach (x <- l)
+      |        Ref.put(x :: Ref.get(z), z);
+      |
+      |    let q = Ref.fresh(rc, Nil);
+      |    List.iterator(rc, l) |>
+      |    Iterator.forEach(match x -> Ref.put(x :: Ref.get(q), q));
+      |
+      |    let k = 4 :: 5 :: 6 :: Nil;
+      |    let w = Ref.fresh(rc, Nil);
+      |    foreach (a <- l) {
+      |        Ref.put(a :: Ref.get(w), w);
+      |        foreach (b <- k)
+      |            Ref.put(b :: Ref.get(w), w)
+      |    };
+      |
+      |    let v = Ref.fresh(rc, Nil);
+      |    List.iterator(rc, l) |>
+      |    Iterator.forEach(match a -> {
+      |        Ref.put(a :: Ref.get(v), v);
+      |        List.iterator(rc, k) |>
+      |        Iterator.forEach(match b -> Ref.put(b :: Ref.get(v), v))
+      |    });
+      |
+      |    let e = Ref.fresh(rc, Nil);
+      |    foreach (a <- l;
+      |             b <- k)
+      |                Ref.put((a, b) :: Ref.get(e), e);
+      |
+      |    let e1 = Ref.fresh(rc, Nil);
+      |    List.iterator(rc, l) |>
+      |    Iterator.forEach(match a -> {
+      |        List.iterator(rc, k) |>
+      |        Iterator.forEach(match b -> Ref.put((a, b) :: Ref.get(e1), e1))
+      |    });
+      |
+      |    let c = Ref.fresh(rc, Nil);
+      |    foreach (a <- l;
+      |             if a > 1;
+      |             b <- k;
+      |             if b < 6)
+      |                Ref.put((a, b) :: Ref.get(c), c);
+      |
+      |    let d = Ref.fresh(rc, Nil);
+      |    foreach (a <- l;
+      |             b <- k;
+      |             if a > 1 and b < 6)
+      |                Ref.put((a, b) :: Ref.get(d), d);
+      |
+      |    let cf = Ref.fresh(rc, Nil);
+      |    List.iterator(rc, l) |>
+      |    Iterator.forEach(match a -> {
+      |        List.iterator(rc, k) |>
+      |        Iterator.forEach(match b -> {
+      |            if (a > 1 and b < 6) Ref.put((a, b) :: Ref.get(cf), cf) else ()
+      |        })
+      |    });
+      |
+      |    (Ref.get(z) == Ref.get(q)) |> blackhole;
+      |    (Ref.get(w) == 6 :: 5 :: 4 :: 3 :: 6 :: 5 :: 4 :: 2 :: 6 :: 5 :: 4 :: 1 :: Nil) |> blackhole;
+      |    (Ref.get(w) == Ref.get(v)) |> blackhole;
+      |    List.sortBy(match (a, _) -> a, Ref.get(e)) |> blackhole;
+      |    (Ref.get(e) == Ref.get(e1)) |> blackhole;
+      |    List.sortBy(match (a, _) -> a, Ref.get(c)) |> blackhole;
+      |    (Ref.get(c) == Ref.get(d)) |> blackhole;
+      |    (Ref.get(c) == Ref.get(cf)) |> blackhole
+      |}
       |""".stripMargin
   }
 
