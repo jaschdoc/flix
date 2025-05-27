@@ -426,7 +426,6 @@ object BenchmarkInliner {
   private def collectRun(name: String, compilationTimings: Seq[(Long, List[(String, Long)])], result: CompilationResult): Run = {
     val lines = result.getTotalLines
     val compilationTime = median(compilationTimings.map(fst)).toLong
-    // TODO: Use ListMap
     val phaseTimings = compilationTimings.flatMap(snd).foldLeft(Map.empty[String, Seq[Long]]) {
       case (acc, (phase, time)) => acc.get(phase) match {
         case Some(timings) => acc + (phase -> timings.appended(time))
