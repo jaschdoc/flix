@@ -245,6 +245,7 @@ object BenchmarkInliner {
     val flix = new Flix().setOptions(opts.copy(output = Some(file.BuildDir)))
     flix.addSourceCode(name, prog)
     flix.addSourceCode("mainProg", mainProg(baseline.toString))
+    flix.addSourceCode("blackHole", blackhole)
     flix.compile().unsafeGet
 
     // Jar
@@ -424,7 +425,8 @@ object BenchmarkInliner {
       val t0 = System.nanoTime()
       val flix = new Flix().setOptions(o)
       ZhegalkinCache.clearCaches()
-      flix.addSourceCode(s"$name.flix", prog)
+      flix.addSourceCode(s"$name", prog)
+      flix.addSourceCode(s"blackhole", blackhole)
       val compilationResult = flix.compile().unsafeGet
       val phaseTimes = flix.phaseTimers.map { case PhaseTime(phase, time) => phase -> time }.toList
       val timing = (compilationResult.totalTime, phaseTimes)
@@ -529,6 +531,13 @@ object BenchmarkInliner {
     }
   }
 
+  private def blackhole: String = {
+    """
+      |pub def blackhole(t: a): Unit \\ IO =
+      |    Ref.fresh(Static, t); ()
+      |""".stripMargin
+  }
+
   private def mainProg(baselineFilePath: String): String = {
     s"""
        |import java.lang.System
@@ -590,9 +599,6 @@ object BenchmarkInliner {
        |pub def nanosToSeconds(nanos: Int64): Int64 = {
        |    nanos / 1_000_000_000i64
        |}
-       |
-       |pub def blackhole(t: a): Unit \\ IO =
-       |    Ref.fresh(Static, t); ()
        |
        |
        |def toJSON(samples: List[Int64]): JSON = {
