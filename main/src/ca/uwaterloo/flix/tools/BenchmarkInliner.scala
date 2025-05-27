@@ -64,35 +64,26 @@ object BenchmarkInliner {
   private val Verbose: Boolean = true
 
   private val MicroBenchmarks: Map[String, String] = Map(
-    "List.filter" -> ???,
-    "List.foldLeft" -> ???,
-    "List.foldRight" -> ???,
-    "List.map" -> ???,
-    "List.length" -> ???,
-    "List.reverse" -> ???,
-    "List.filterMap" -> ???,
+    "List.filter" -> listFilter,
+    "List.foldLeft" -> listFoldLeft,
+    "List.foldRight" -> listFoldRight,
+    "List.map" -> listMap,
+    "List.length" -> listLength,
+    "List.reverse" -> listReverse,
+    "List.filterMap" -> listFilterMap,
     "Map.filter" -> ???,
     "Map.foldLeft" -> ???,
     "Map.foldRight" -> ???,
     "Set.filter" -> ???,
     "Set.foldLeft" -> ???,
     "Set.foldRight" -> ???,
-    "map10k" -> map10KLength,
+    "map10k" -> map10K,
     "filterMap10k" -> filterMap10K,
-    "map10kOptimized" -> ???,
-    "filterMap10kOptimized" -> ???
+    "map10kOptimized" -> map10KOptimized,
+    "filterMap10kOptimized" -> filterMap10KOptimized
   )
 
   private val MediumBenchmarks: Map[String, String] = Map(
-    "List.filter" -> listFilter,
-    "List.foldLeft" -> listFoldLeft,
-    "List.foldRight" -> listFoldRight,
-    "List.length" -> listLength,
-    "List.reverse" -> listReverse,
-    "map10KLengthOptimized" -> map10KLengthOptimized,
-    "filterMap10KOptimized" -> filterMap10KOptimized,
-    "List.map" -> listMap,
-    "List.filterMap" -> listFilterMap,
   )
 
   private val MacroBenchmarks: Map[String, String] = Map(
@@ -723,7 +714,7 @@ object BenchmarkInliner {
       |""".stripMargin
   }
 
-  private def map10KLength: String = {
+  private def map10K: String = {
     """
       |pub def runBenchmark(): Unit \ IO = {
       |    let l1 = range(0, 10_000);
@@ -767,7 +758,7 @@ object BenchmarkInliner {
       |""".stripMargin
   }
 
-  private def map10KLengthOptimized: String = {
+  private def map10KOptimized: String = {
     """
       |pub def runBenchmark(): Unit \ IO = {
       |    let top = 10_000 - 1;
