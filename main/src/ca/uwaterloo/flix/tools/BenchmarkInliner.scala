@@ -17,6 +17,7 @@ package ca.uwaterloo.flix.tools
 
 import ca.uwaterloo.flix.api.{Flix, PhaseTime}
 import ca.uwaterloo.flix.language.ast.shared.SecurityContext
+import ca.uwaterloo.flix.language.ast.Symbol
 import ca.uwaterloo.flix.language.phase.unification.zhegalkin.ZhegalkinCache
 import ca.uwaterloo.flix.runtime.CompilationResult
 import ca.uwaterloo.flix.util.StatUtils.{average, median}
@@ -175,7 +176,7 @@ object BenchmarkInliner {
 
     println("Benchmarking compilation...")
     val t0 = System.nanoTime()
-    val benchmarks = runBenchmarking(programs, opts)
+    val benchmarks = runBenchmarking(programs, opts.copy(entryPoint = Some(Symbol.mkDefnSym("runBenchmark"))))
     val filePath = benchOutputPath.resolve(outFileName).normalize()
     FileOps.writeJSON(filePath, benchmarks)
 
