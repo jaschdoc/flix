@@ -81,10 +81,10 @@ object BenchmarkInliner {
     "Set.filter" -> libSetFilter,
     "Set.foldLeft" -> libSetFoldLeft,
     "Set.foldRight" -> libSetFoldRight,
-    "map10k" -> map10K,
-    "filterMap10k" -> filterMap10K,
-    "map10kOptimized" -> map10KOptimized,
-    "filterMap10kOptimized" -> filterMap10KOptimized,
+    "Map10k" -> map10K,
+    "FilterMap10k" -> filterMap10K,
+    "Map10kOptimized" -> map10KOptimized,
+    "FilterMap10kOptimized" -> filterMap10KOptimized,
   )
 
   /**
@@ -92,12 +92,12 @@ object BenchmarkInliner {
     * but remain small programs.
     */
   private val MediumBenchmarks: Map[String, String] = Map(
-    "mutualRecursion" -> mutualRecursion,
-    "imperativeForLoops" -> imperativeForLoops,
-    "internalMutability" -> internalMutability,
+    "MutualRecursion" -> mutualRecursion,
+    "ImperativeForLoops" -> imperativeForLoops,
+    "InternalMutability" -> internalMutability,
     "Introduction" -> introduction,
-    "connectGraph" -> connectGraph,
-    "deliveryDate" -> deliveryDate,
+    "ConnectGraph" -> connectGraph,
+    "DeliveryDate" -> deliveryDate,
     "RailRoadNetwork" -> railRoadNetwork,
     "TopSort" -> topSort,
     "TwoSat" -> twoSat,
