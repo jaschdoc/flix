@@ -100,7 +100,6 @@ object BenchmarkInliner {
     "DeliveryDate" -> deliveryDate,
     "RailRoadNetwork" -> railRoadNetwork,
     "TopSort" -> topSort,
-    "TuringMachine" -> turingMachine,
     "TwoSat" -> twoSat,
   )
 
@@ -120,7 +119,8 @@ object BenchmarkInliner {
     "SingleSourceShortestPaths" -> singleSourceShortestPaths,
     "SingleSourceShortestPathsArbitrary" -> singleSourceShortestPathsArbitrary,
     "Stratifier" -> stratifier,
-    "Talpin1992" -> talpin1992
+    "Talpin1992" -> talpin1992,
+    "TuringMachine" -> turingMachine,
   )
 
   private def baseDir: Path = Path.of("./build/").normalize()
