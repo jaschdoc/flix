@@ -1174,9 +1174,9 @@ object BenchmarkInliner {
       |        use ToString.toString;
       |        let t = ex(x);
       |        def tapeString(xx: List[t]) = xx |> map(toString) |> String.intercalate("");
-      |        let lstring = tapeString(t.left |> List.reverse);
+      |        let lstring = tapeString(t#left |> List.reverse);
       |        let padding = String.repeat(String.length(lstring), " ");
-      |        "${padding}v\n${lstring}${t.middle |> Console.green}${tapeString(t.right)}"
+      |        "${padding}v\n${lstring}${t#middle}${tapeString(t#right)}"
       |    }
       |}
       |
@@ -1191,23 +1191,23 @@ object BenchmarkInliner {
       |
       |def moveLeft(t0: Tape[t]): Tape[t] = {
       |    let t = ex(t0);
-      |    let (middle, left) = popOrElse(t.left, t.zero);
+      |    let (middle, left) = popOrElse(t#left, t#zero);
       |    Tape.Tape({
       |        left = left,
       |        middle = middle,
-      |        right = t.middle :: t.right,
-      |        zero = t.zero
+      |        right = t#middle :: t#right,
+      |        zero = t#zero
       |    })
       |}
       |
       |def moveRight(t0: Tape[t]): Tape[t] = {
       |    let t = ex(t0);
-      |    let (middle, right) = popOrElse(t.right, t.zero);
+      |    let (middle, right) = popOrElse(t#right, t#zero);
       |    Tape.Tape({
-      |        left = t.middle :: t.left,
+      |        left = t#middle :: t#left,
       |        middle = middle,
       |        right = right,
-      |        zero = t.zero
+      |        zero = t#zero
       |    })
       |}
       |
@@ -1247,16 +1247,16 @@ object BenchmarkInliner {
       |type alias Monitor[t: Type, state: Type, ef: Eff] = MachineRunState[t, state] -> Unit \ ef
       |
       |def runMachine(zero: t, initMargin: Int32, monitor: Monitor[t, state, ef], m: Machine[t, state]): Tape[t] \ ef with Eq[state]= {
-      |    runMachineAux(m, monitor, tapeOf(initMargin, zero), m.start)
+      |    runMachineAux(m, monitor, tapeOf(initMargin, zero), m#start)
       |}
       |
       |def runMachineAux(m: Machine[t, state], monitor: Monitor[t, state, ef], t: Tape[t], current: state): Tape[t] \ ef with Eq[state] = {
       |    let rec = runMachineAux(m, monitor);
-      |    if (current == m.end)
+      |    if (current == m#end)
       |        t
       |    else {
       |        monitor({currentState = current, tape = t});
-      |        let (elm, dir, next) = m.transition(ex(t).middle, current);
+      |        let (elm, dir, next) = m#transition(ex(t)#middle, current);
       |        let nextTape = t |> setMiddle(elm) |> moveDir(dir);
       |        rec(nextTape, next)
       |    }
@@ -1314,14 +1314,14 @@ object BenchmarkInliner {
       |def sequence(m1: Machine[t, state1], m2: Machine[t, state2]): Machine[t, Either[state1, state2]] with Eq[state1] = {
       |    use Either.{Left, Right};
       |    def transition(t, state) = match state {
-      |        case Left(state1) if state1 == m1.end =>
-      |            m2.transition(t, m2.start) |> mapThird(Right)
+      |        case Left(state1) if state1 == m1#end =>
+      |            m2#transition(t, m2#start) |> mapThird(Right)
       |        case Left(state1) =>
-      |            m1.transition(t, state1) |> mapThird(Left)
+      |            m1#transition(t, state1) |> mapThird(Left)
       |        case Right(state2) =>
-      |            m2.transition(t, state2) |> mapThird(Right)
+      |            m2#transition(t, state2) |> mapThird(Right)
       |    };
-      |    {transition = transition, start = Left(m1.start), end = Right(m2.end)}
+      |    {transition = transition, start = Left(m1#start), end = Right(m2#end)}
       |}
       |
       |def runBenchmark(): Unit \ IO = {
@@ -1329,7 +1329,7 @@ object BenchmarkInliner {
       |        mapN(10, Direction.Right, _ -> "s") `sequence`
       |        moveN(1, Direction.Left) `sequence`
       |        goUntil(Direction.Left, t -> t != "s");
-      |    let result = runMachine("_", 0, ms -> blackhole(ms.tape), machine);
+      |    let result = runMachine("_", 0, ms -> blackhole(ms#tape), machine);
       |    blackhole(result)
       |}
       |
