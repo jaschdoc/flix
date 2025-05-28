@@ -35,7 +35,14 @@ import scala.util.{Failure, Success, Using}
 
 object BenchmarkInliner {
 
-  sealed trait Suite
+  sealed trait Suite {
+    override def toString: String = this match {
+      case Suite.Micro => "micro"
+      case Suite.Medium => "medium"
+      case Suite.Macro => "macro"
+      case Suite.All => "all"
+    }
+  }
 
   object Suite {
 
@@ -156,7 +163,7 @@ object BenchmarkInliner {
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
     FileOps.writeString(runScriptPath, mkRunScript(programs.size))
-    FileOps.writeString(benchmarkCompilerScriptPath, mkCompilerScript)
+    FileOps.writeString(benchmarkCompilerScriptPath, mkCompilerScript(suite))
     FileOps.writeString(pythonPath, Python)
     Files.createDirectories(benchOutputPath)
     println(s"Please run $runScriptPath")
@@ -204,12 +211,7 @@ object BenchmarkInliner {
   }
 
   private def outFileFromSuite(suite: Suite): String = {
-    suite match {
-      case Suite.Micro => "micro.json"
-      case Suite.Medium => "medium.json"
-      case Suite.Macro => "macro.json"
-      case Suite.All => "all.json"
-    }
+    s"$suite.json"
   }
 
   private def programsFromSuite(suite: Suite): Map[String, String] = {
@@ -309,10 +311,10 @@ object BenchmarkInliner {
        |""".stripMargin
   }
 
-  private def mkCompilerScript: String = {
+  private def mkCompilerScript(suite: Suite): String = {
     s"""#!/bin/bash
        |
-       |java -jar flix.jar benchmark-inliner-compiler
+       |java -jar flix.jar benchmark-inliner-compiler --suite $suite
        |
        |""".stripMargin
   }

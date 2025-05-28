@@ -500,6 +500,19 @@ object Main {
 
       cmd("benchmark-inliner-compiler").action((_, c) => c.copy(command = Command.RunInlinerBenchmark))
         .text("Benchmark compilation for inliner")
+        .children(
+          opt[String]("suite")
+            .action {
+              case (value, c) => value.toLowerCase match {
+                case "micro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Micro)
+                case "medium" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Medium)
+                case "macro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Macro)
+                case "all" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.All)
+                case _ => c
+              }
+            }
+            .text("the suite of programs to run ('micro', 'medium', 'macro', 'all') - default is 'micro'")
+        )
 
       cmd("setup-inliner-benchmark").action((_, c) => c.copy(command = Command.SetupInlinerBenchmark(None)))
         .text("Sets up inliner experiments")
