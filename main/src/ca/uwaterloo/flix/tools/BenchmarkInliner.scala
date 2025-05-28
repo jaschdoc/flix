@@ -107,6 +107,7 @@ object BenchmarkInliner {
     * A set of benchmarks that are full programs or libraries or expensive functions.
     */
   private val MacroBenchmarks: Map[String, String] = Map(
+    "ANSITerminal" -> ansiTerminal,
     "FordFulkerson" -> fordFulkerson,
     "FloydWarshall" -> floydWarshall,
     "IDE" -> ide,
@@ -1559,6 +1560,165 @@ object BenchmarkInliner {
       |    pub def exampleGraph01(): Set[(Int32, Int32, Int32)] =
       |        Set#{ (0, 10, 1), (0, 10, 3), (1, 2, 3), (1, 4, 2), (1, 8, 4), (2, 10, 5), (3, 9, 4), (4, 6, 2), (4, 10, 5) }
       |}
+      |""".stripMargin
+  }
+
+  private def ansiTerminal: String = {
+    """
+      |mod Terminal {
+      |
+      |    pub def cursorUp(n: Int32): Unit \ Console =
+      |        if (n <= 0) () else
+      |        output(Terminal.String.cursorUp(n))
+      |
+      |    pub def cursorDown(n: Int32): Unit \ Console =
+      |        if (n <= 0) () else
+      |        output(Terminal.String.cursorDown(n))
+      |
+      |    pub def cursorForward(n: Int32): Unit \ Console =
+      |        if (n <= 0) () else
+      |        output(Terminal.String.cursorForward(n))
+      |
+      |    pub def cursorBack(n: Int32): Unit \ Console =
+      |        if (n <= 0) () else
+      |        output(Terminal.String.cursorBack(n))
+      |
+      |    pub def cursorTo(row: {row = Int32}, column: Int32): Unit \ Console =
+      |        if (row#row < 0 or column < 0) () else
+      |        output(Terminal.String.cursorTo(row, column))
+      |
+      |    pub def clearScreenAfterCursor(): Unit \ Console =
+      |        output(Terminal.String.clearScreenAfterCursor())
+      |
+      |    pub def clearScreenBeforeCursor(): Unit \ Console =
+      |        output(Terminal.String.clearScreenBeforeCursor())
+      |
+      |    pub def clearScreenAndReset(): Unit \ Console =
+      |        output(Terminal.String.clearScreenAndReset())
+      |
+      |    pub def clearLineAfterCursor(): Unit \ Console =
+      |        output(Terminal.String.clearLineAfterCursor())
+      |
+      |    pub def clearLineBeforeCursor(): Unit \ Console =
+      |        output(Terminal.String.clearLineBeforeCursor())
+      |
+      |    pub def clearLine(): Unit \ Console =
+      |        output(Terminal.String.clearLine())
+      |
+      |    pub def saveCursor(): Unit \ Console =
+      |        output(Terminal.String.saveCursor())
+      |
+      |    pub def restoreCursor(): Unit \ Console =
+      |        output(Terminal.String.restoreCursor())
+      |
+      |    mod String {
+      |        use Terminal.csi
+      |
+      |        pub def cursorUp(n: Int32): String =
+      |            if (n <= 0) "" else csi("${n}A")
+      |
+      |        pub def cursorDown(n: Int32): String =
+      |            if (n <= 0) "" else csi("${n}B")
+      |
+      |        pub def cursorForward(n: Int32): String =
+      |            if (n <= 0) "" else csi("${n}C")
+      |
+      |        pub def cursorBack(n: Int32): String =
+      |            if (n <= 0) "" else csi("${n}D")
+      |
+      |        pub def cursorTo(row: {row = Int32}, column: Int32): String =
+      |            if (row#row < 0 or column < 0) "" else
+      |            csi("${row#row+1};${column+1}H")
+      |
+      |        pub def clearScreenAfterCursor(): String =
+      |            csi("J")
+      |
+      |        pub def clearScreenBeforeCursor(): String =
+      |            csi("1J")
+      |
+      |        pub def clearScreenAndReset(): String =
+      |            csi("2J") + cursorTo(row = 0, 0)
+      |
+      |        pub def clearLineAfterCursor(): String =
+      |            csi("K")
+      |
+      |        pub def clearLineBeforeCursor(): String =
+      |            csi("1K")
+      |
+      |        pub def clearLine(): String =
+      |            csi("2K")
+      |
+      |        pub def saveCursor(): String =
+      |            csi("s")
+      |
+      |        pub def restoreCursor(): String =
+      |            csi("u")
+      |    }
+      |
+      |    def output(x: s): Unit \ Console with ToString[s] =
+      |        Console.print(ToString.toString(x))
+      |
+      |    def csi(s: String): String = {
+      |        let escapeByte = "\\u001B";
+      |        "${escapeByte}[${s}"
+      |    }
+      |
+      |}
+      |
+      |mod TestTerminal {
+      |
+      |pub def runWithIO(f: Unit -> b \ ef): b \ (ef - Console) + IO =
+      |    run {
+      |        f()
+      |    } with handler Console {
+      |        def readln(k)      = { k("input") }
+      |        def print(s, k)    = { blackhole(s); k() }
+      |        def eprint(s, k)   = { blackhole(s); k() }
+      |        def println(s, k)  = { blackhole(s); k() }
+      |        def eprintln(s, k) = { blackhole(s); k() }
+      |    }
+      |
+      |    def output(x: t): Unit \ Console with ToString[t] =
+      |        Console.print(ToString.toString(x))
+      |
+      |    def outputln(x: t): Unit \ Console with ToString[t] =
+      |        Console.println(ToString.toString(x))
+      |
+      |    def sleep(millis: Int64): Unit \ IO =
+      |        blackhole(millis)
+      |
+      |    def sleepTime(): Int64 = 1000i64
+      |
+      |    def nextLineIsh(): Unit \ Console = {
+      |        Terminal.cursorDown(1);
+      |        outputln("")
+      |    }
+      |
+      |    pub def testSaveAndRestore(): Unit \ IO = runWithIO(() -> {
+      |        outputln("Expected Line: <<<x>>>");
+      |
+      |        // avoid scrolling
+      |        outputln("");
+      |        Terminal.cursorUp(1);
+      |
+      |        output("<<<");
+      |        Terminal.saveCursor();
+      |        outputln(" >>>");
+      |
+      |        sleep(sleepTime());
+      |        Terminal.restoreCursor();
+      |        sleep(sleepTime());
+      |
+      |        output("x");
+      |        nextLineIsh()
+      |    })
+      |
+      |}
+      |
+      |def runBenchmark(): Unit \ IO = {
+      |    TestTerminal.testSaveAndRestore()
+      |}
+      |
       |""".stripMargin
   }
 
