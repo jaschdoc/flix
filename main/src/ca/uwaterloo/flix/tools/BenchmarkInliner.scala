@@ -113,6 +113,7 @@ object BenchmarkInliner {
     "IDE" -> ide,
     "IFDS" -> ifds,
     "Interpreter" -> interpreter,
+    "ListSet" -> listSet,
     "Palindrome" -> palindrome,
     "Parsers" -> parsers,
     "Sequence" -> sequence,
@@ -2444,6 +2445,471 @@ object BenchmarkInliner {
       |    blackhole(a == b)
       |}
       |
+      |""".stripMargin
+  }
+
+  private def listSet: String = {
+    """
+      |mod JonathanStarup {
+      |pub enum ListSet[t](List[t])
+      |
+      |instance Eq[ListSet[t]] with Eq[t] {
+      |    pub def eq(x: ListSet[t], y: ListSet[t]): Bool =
+      |        ListSet.eq(x, y)
+      |}
+      |
+      |instance ToString[ListSet[t]] with ToString[t], Eq[t] {
+      |    pub def toString(x: ListSet[t]): String =
+      |        ListSet.toString(x)
+      |}
+      |
+      |instance LowerBound[ListSet[t]] with Eq[t] {
+      |    pub def minValue(): ListSet[t] =
+      |        ListSet.empty()
+      |}
+      |
+      |instance PartialOrder[ListSet[t]] with Eq[t] {
+      |    pub def lessEqual(x: ListSet[t], y: ListSet[t]): Bool =
+      |        ListSet.isSubsetOf(x, y)
+      |}
+      |
+      |instance JoinLattice[ListSet[t]] with Eq[t] {
+      |    pub def leastUpperBound(x: ListSet[t], y: ListSet[t]): ListSet[t] =
+      |        ListSet.union(x, y)
+      |}
+      |
+      |instance MeetLattice[ListSet[t]] with Eq[t] {
+      |    pub def greatestLowerBound(x: ListSet[t], y: ListSet[t]): ListSet[t] =
+      |        ListSet.intersection(x, y)
+      |}
+      |
+      |instance SemiGroup[ListSet[t]] with Eq[t] {
+      |    pub def combine(x: ListSet[t], y: ListSet[t]): ListSet[t] =
+      |        ListSet.union(x, y)
+      |}
+      |
+      |instance CommutativeSemiGroup[ListSet[t]] with Eq[t]
+      |
+      |instance Collectable[ListSet[t]] with Eq[t] {
+      |    type Elm = t
+      |    type Aef = {}
+      |    pub def collect(iter: Iterator[t, ef, r]): ListSet[t] \ ef + r =
+      |        ListSet.collect(iter)
+      |}
+      |
+      |mod ListSet {
+      |    use Eq.{eq, neq}
+      |    use Foldable.foldLeft
+      |    use JonathanStarup.{UnorderedList => UList}
+      |    use JonathanStarup.ListOps
+      |
+      |    def extract(s: ListSet[t]): List[t] = {
+      |        let ListSet(l) = s;
+      |        l
+      |    }
+      |
+      |    pub def empty(): ListSet[t] with Eq[t] =
+      |        ListSet(Nil)
+      |
+      |    pub def insert(x: t, s: ListSet[t]): ListSet[t] with Eq[t] =
+      |        s |> extract |> listInsert(x) |> ListSet
+      |
+      |    def listInsert(x: t, l: List[t]): List[t] with Eq[t] =
+      |        if (List.memberOf(x, l)) l else x :: l
+      |
+      |    pub def remove(x: t, s: ListSet[t]): ListSet[t] with Eq[t] =
+      |        s |> extract |> listRemove(x) |> ListSet
+      |
+      |    def listRemove(x: t, l: List[t]): List[t] with Eq[t] =
+      |        listRemoveHelper(x, Nil, l)
+      |
+      |    def listRemoveHelper(x: t, acc: List[t], l: List[t]): List[t] with Eq[t] =
+      |        match l {
+      |            case hd :: tl =>
+      |                if (hd == x) UList.append(acc, tl)
+      |                else listRemoveHelper(x, hd :: acc, tl)
+      |            case Nil => acc
+      |        }
+      |
+      |    pub def memberOf(x: t, s: ListSet[t]): Bool with Eq[t] =
+      |        s |> extract |> List.memberOf(x)
+      |
+      |    pub def union(s1: ListSet[t], s2: ListSet[t]): ListSet[t] with Eq[t] =
+      |        listUnion(extract(s1), extract(s2)) |> ListSet
+      |
+      |    def listUnion(l1: List[t], l2: List[t]): List[t] with Eq[t] =
+      |        (l1, l2) ||> foldLeft(acc -> elm -> listInsert(elm, acc))
+      |
+      |    pub def intersection(
+      |        s1: ListSet[t], s2: ListSet[t]
+      |    ): ListSet[t] with Eq[t] =
+      |        listIntersection(extract(s1), extract(s2)) |> ListSet
+      |
+      |    def listIntersection(l1: List[t], l2: List[t]): List[t] with Eq[t] =
+      |        l1 |> UList.filter(elm -> List.memberOf(elm, l2))
+      |
+      |    pub def difference(s1: ListSet[t], s2: ListSet[t]): ListSet[t] with Eq[t] =
+      |        listDifference(extract(s1), extract(s2)) |> ListSet
+      |
+      |    def listDifference(l1: List[t], l2: List[t]): List[t] with Eq[t] =
+      |        (l1, l2) ||> foldLeft(acc -> elm -> listRemove(elm, acc))
+      |
+      |    pub def eq(s1: ListSet[t], s2: ListSet[t]): Bool with Eq[t] =
+      |        listEq(extract(s1), extract(s2))
+      |
+      |    def listEq(l1: List[t], l2: List[t]): Bool with Eq[t] =
+      |        ListOps.sizeEq(l1, l2) and listIsSubsetOf(l1, l2)
+      |
+      |    pub def isSubsetOf(s1: ListSet[t], s2: ListSet[t]): Bool with Eq[t] =
+      |        listIsSubsetOf(extract(s1), extract(s2))
+      |
+      |    def listIsSubsetOf(l1: List[t], l2: List[t]): Bool with Eq[t] =
+      |        l1 |> List.forAll(elm -> List.memberOf(elm, l2))
+      |
+      |    pub def size(s: ListSet[t]): Int32 with Eq[t] =
+      |        s |> extract |> List.size
+      |
+      |    pub def toString(s: ListSet[t]): String with ToString[t], Eq[t] = {
+      |        use StringBuilder.appendString;
+      |        region rc {
+      |            let sb = StringBuilder.empty(rc);
+      |            appendString("ListSet(", sb);
+      |            match extract(s) {
+      |                case hd :: tl =>
+      |                    appendString("${hd}", sb);
+      |                    tl |> List.forEach(x -> appendString(", ${x}", sb))
+      |                case Nil => ()
+      |            };
+      |            appendString(")", sb);
+      |            StringBuilder.toString(sb)
+      |        }
+      |    }
+      |
+      |    pub def collect(iter: Iterator[t, ef, r]): ListSet[t] \ ef + r with Eq[t] =
+      |        (Nil, iter) ||>
+      |            Iterator.foldLeft(s -> elm -> listInsert(elm, s)) |>
+      |            ListSet
+      |
+      |    pub def fromIterable(iter: i): ListSet[elm] \ Iterable.Aef[i] with Iterable[i], Eq[elm] where Iterable.Elm[i] ~ elm =
+      |        region local {
+      |            iter |> Iterable.iterator(local) |> collect
+      |        }
+      |
+      |    pub def toOrderedSet(f: t -> tt, s: ListSet[t]): Set[tt] with Eq[t], Order[tt] =
+      |        region local {
+      |            s |> extract |> List.iterator(local) |> Iterator.map(f) |> Collectable.collect
+      |        }
+      |
+      |    pub def eqSizes(s1: ListSet[t], s2: ListSet[t]): Bool with Eq[t] =
+      |        ListOps.sizeEq(extract(s1), extract(s2))
+      |
+      |    pub def count(f: t -> Bool, s: ListSet[t]): Int32 with Eq[t] =
+      |        s |> extract |> List.count(f)
+      |
+      |    pub def exists(f: t -> Bool, s: ListSet[t]): Bool with Eq[t] =
+      |        s |> extract |> List.exists(f)
+      |
+      |    pub def filter(f: t -> Bool, s: ListSet[t]): ListSet[t] with Eq[t] =
+      |        s |> extract |> UList.filter(f) |> ListSet
+      |
+      |    pub def filterMap(
+      |        f: t -> Option[tt], s: ListSet[t]
+      |    ): ListSet[tt] with Eq[t], Eq[tt] =
+      |        s |> extract |> listFilterMap(f) |> ListSet
+      |
+      |    def listFilterMap(f: t -> Option[tt], l: List[t]): List[tt] with Eq[tt] =
+      |        listFilterMapHelper(f, Nil, l)
+      |
+      |    def listFilterMapHelper(
+      |        f: t -> Option[tt], acc: List[tt], l: List[t]
+      |    ): List[tt] with Eq[tt] = match l {
+      |        case hd :: tl => match f(hd) {
+      |            case Some(v) => listFilterMapHelper(f, listInsert(v, acc), tl)
+      |            case None => listFilterMapHelper(f, acc, tl)
+      |        }
+      |        case Nil => acc
+      |    }
+      |
+      |    pub def flatten(s: ListSet[ListSet[t]]): ListSet[t] with Eq[t] =
+      |        (Nil, extract(s)) ||>
+      |            List.foldLeft(acc -> extract >> listUnion(acc)) |>
+      |            ListSet
+      |
+      |    pub def forAll(f: t -> Bool, s: ListSet[t]): Bool with Eq[t] =
+      |        s |> extract |> List.forAll(f)
+      |
+      |    pub def isEmpty(s: ListSet[t]): Bool with Eq[t] =
+      |        s |> extract |> List.isEmpty
+      |
+      |    pub def nonEmpty(s: ListSet[t]): Bool with Eq[t] =
+      |        s |> extract |> List.nonEmpty
+      |
+      |    pub def isProperSubsetOf(s1: ListSet[t], s2: ListSet[t]): Bool with Eq[t] =
+      |        listIsProperSubsetOf(extract(s1), extract(s2))
+      |
+      |    def listIsProperSubsetOf(l1: List[t], l2: List[t]): Bool with Eq[t] =
+      |        ListOps.sizeLessThan(l1, l2) and listIsSubsetOf(l1, l2)
+      |
+      |    pub def map(f: t -> tt, s: ListSet[t]): ListSet[tt] with Eq[t], Eq[tt] =
+      |        s |> extract |> listMap(f) |> ListSet
+      |
+      |    def listMap(f: t -> tt, l: List[t]): List[tt] with Eq[tt] =
+      |        listMapHelper(f, Nil, l)
+      |
+      |    def listMapHelper(
+      |        f: t -> tt, acc: List[tt], l: List[t]
+      |    ): List[tt] with Eq[tt] = match l {
+      |        case hd :: tl => listMapHelper(f, listInsert(f(hd), acc), tl)
+      |        case Nil => acc
+      |    }
+      |
+      |    pub def maximumBy(
+      |        cmp: t -> t -> Comparison, s: ListSet[t]
+      |    ): Option[t] with Eq[t] =
+      |        s |> extract |> List.maximumBy(cmp)
+      |
+      |    pub def minimumBy(
+      |        cmp: t -> t -> Comparison, s: ListSet[t]
+      |    ): Option[t] with Eq[t] =
+      |        s |> extract |> List.minimumBy(cmp)
+      |
+      |    pub def partition(
+      |        f: t -> Bool, s: ListSet[t]
+      |    ): (ListSet[t], ListSet[t]) with Eq[t] =
+      |        s |>
+      |            extract |>
+      |            UList.partition(f) |>
+      |            (match (x, y) -> (ListSet(x), ListSet(y)))
+      |
+      |    pub def range(b: Int32, e: Int32): ListSet[Int32] =
+      |        List.range(b, e) |> ListSet
+      |
+      |    pub def replace(
+      |        src: {src = t}, dst: {dst = t}, s: ListSet[t]
+      |    ): ListSet[t] with Eq[t] =
+      |        s |> extract |> listReplace(src, dst) |> ListSet
+      |
+      |    def listReplace(
+      |        src: {src = t}, dst: {dst = t}, l: List[t]
+      |    ): List[t] with Eq[t] =
+      |        match UList.removeOpt(src#src, l) {
+      |            case Some(removed) => listInsert(dst#dst, removed)
+      |            case None => l
+      |        }
+      |
+      |    pub def unfold(
+      |        f: state -> Option[(t, state)] \ ef, state: state
+      |    ): ListSet[t] \ ef with Eq[t] =
+      |        listUnfold(f, Nil, state) |> ListSet
+      |
+      |    def listUnfold(
+      |        f: state -> Option[(t, state)] \ ef, acc: List[t], state0: state
+      |    ): List[t] \ ef with Eq[t] =
+      |        match f(state0) {
+      |            case Some((v, state1)) => listUnfold(f, listInsert(v, acc), state1)
+      |            case None => acc
+      |        }
+      |
+      |    pub def unfoldWithIter(
+      |        f: Unit -> Option[t] \ ef
+      |    ): ListSet[t] \ ef with Eq[t] =
+      |        listUnfoldWithIter(f, Nil) |> ListSet
+      |
+      |    def listUnfoldWithIter(
+      |        f: Unit -> Option[t] \ ef, acc: List[t]
+      |    ): List[t] \ ef with Eq[t] =
+      |        match f() {
+      |            case Some(v) => listUnfoldWithIter(f, listInsert(v, acc))
+      |            case None => acc
+      |        }
+      |
+      |    pub def sumWith(f: t -> Int32, s: ListSet[t]): Int32 with Eq[t] =
+      |        s |> extract |> List.sumWith(f)
+      |
+      |    pub def subsets(s: ListSet[t]): ListSet[ListSet[t]] with Eq[t] =
+      |        s |> extract |> listSubsets |> List.map(ListSet) |> ListSet
+      |
+      |    def listSubsets(l: List[t]): List[List[t]] with Eq[t] =
+      |        (Nil :: Nil, l) ||>
+      |            List.foldLeft(
+      |                acc -> elm -> listUnion(acc |> List.map(listInsert(elm)), acc)
+      |            )
+      |
+      |    pub def singleton(x: t): ListSet[t] with Eq[t] =
+      |        ListSet(x :: Nil)
+      |
+      |}
+      |
+      |mod UnorderedList {
+      |
+      |    pub def append(l1: List[t], l2: List[t]): List[t] = match l1 {
+      |        case hd :: tl => append(tl, hd :: l2)
+      |        case Nil => l2
+      |    }
+      |
+      |    pub def removeOpt(x: t, l: List[t]): Option[List[t]] with Eq[t] =
+      |        removeOptHelper(x, Nil, l)
+      |
+      |    def removeOptHelper(
+      |        x: t, acc: List[t], l: List[t]
+      |    ): Option[List[t]] with Eq[t] =
+      |        match l {
+      |            case hd :: tl =>
+      |                if (hd == x) Some(append(acc, tl))
+      |                else removeOptHelper(x, hd :: acc, tl)
+      |            case Nil => None
+      |        }
+      |
+      |    pub def partition(f: t -> Bool, l: List[t]): (List[t], List[t]) =
+      |        partitionHelper(f, Nil, Nil, l)
+      |
+      |    def partitionHelper(
+      |        f: t -> Bool, accTrue: List[t], accFalse: List[t], l: List[t]
+      |    ): (List[t], List[t]) =
+      |        match l {
+      |            case hd :: tl =>
+      |                if (f(hd)) partitionHelper(f, hd :: accTrue, accFalse, tl)
+      |                else partitionHelper(f, accTrue, hd :: accFalse, tl)
+      |            case Nil => (accTrue, accFalse)
+      |        }
+      |
+      |    pub def filter(f: t -> Bool, l: List[t]): List[t] with Eq[t] =
+      |        filterHelper(f, Nil, l)
+      |
+      |    def filterHelper(
+      |        f: t -> Bool, acc: List[t], l: List[t]
+      |    ): List[t] with Eq[t] =
+      |        match l {
+      |            case hd :: tl =>
+      |                if (f(hd)) filterHelper(f, hd :: acc, tl)
+      |                else filterHelper(f, acc, tl)
+      |            case Nil => acc
+      |        }
+      |
+      |}
+      |
+      |mod ListOps {
+      |
+      |    pub def sizeLessThan(l1: List[t], l2: List[t]): Bool = match (l1, l2) {
+      |        case (_ :: tl1, _ :: tl2) => sizeLessThan(tl1, tl2)
+      |        case (Nil, _ :: _) => true
+      |        case (_, Nil) => false
+      |    }
+      |
+      |    pub def sizeEq(l1: List[t], l2: List[t]): Bool = match (l1, l2) {
+      |        case (_ :: next1, _ :: next2) => sizeEq(next1, next2)
+      |        case (Nil, Nil) => true
+      |        case _ => false
+      |    }
+      |
+      |}
+      |
+      |}
+      |
+      |mod JonathanStarup.Test.Property.ListSetGenerator {
+      |    use Collectable.collect
+      |    use JonathanStarup.ListSet
+      |    use Result.Err
+      |    use Result.Ok
+      |
+      |    pub def fromLength(length: Int32): c \ Collectable.Aef[c] + Random with Collectable[c] where Collectable.Elm[c] ~ Int32 =
+      |        region local {
+      |            fromLengthIterator(local, length) |> collect
+      |        }
+      |
+      |    def fromLengthIterator(rc: Region[r], length: Int32): Iterator[Int32, r + Random, r] \ r =
+      |        use Ref.{fresh, get, transform};
+      |        let runningLength = fresh(rc, length);
+      |        Iterator.iterate(rc, () -> {
+      |            if (get(runningLength) <= 0) None
+      |            else {
+      |                runningLength |> transform(Sub.sub(1));
+      |                Some(Random.randomInt32())
+      |            }
+      |        })
+      |
+      |    pub def randomIterator(
+      |        rc: Region[r], amount: Int32
+      |    ): Iterator[c, r + Random + aef, r] \ r
+      |    with Collectable[c] where Collectable.Elm[c] ~ Int32, Collectable.Aef[c] ~ aef = {
+      |        use Ref.{fresh, get, transform};
+      |        let runningAmount = fresh(rc, amount);
+      |        let runningLen = fresh(rc, 2);
+      |        let iter = Iterator.iterate(rc)(() -> {
+      |            if (get(runningAmount) <= 0) None
+      |            else {
+      |                runningAmount |> transform(x -> x - 1);
+      |                let lenInc = nextNatWithMax(5) + 1;
+      |                runningLen |> transform(Add.add(lenInc));
+      |                Some(fromLength(get(runningLen)))
+      |            }
+      |        });
+      |        def consThing(k, it) = {
+      |            let justK = Iterator.singleton(rc, () -> checked_ecast(fromLength(k))) |> Iterator.map(f -> f());
+      |            Iterator.append(justK, it)
+      |        };
+      |        iter |>
+      |            consThing(2) |>
+      |            consThing(1) |>
+      |            consThing(0)
+      |    }
+      |
+      |    def nextNatWithMax(max: Int32): Int32 \ Random = {
+      |        Int32.modulo(Random.randomInt32(), Int32.max(max, 1))
+      |    }
+      |}
+      |
+      |mod JonathanStarup.Test.Property.TestListSet {
+      |    use JonathanStarup.ListSet
+      |    use JonathanStarup.Test.Property.ListSetGenerator
+      |    use Abort.abort
+      |
+      |    def runCrash(f: Unit -> Unit \ ef): Bool \ ef + IO - Abort =
+      |        run {f(); true} with handler Abort {
+      |            def abort(msg, _) = {
+      |                println("Test failed: ${msg}");
+      |                false
+      |            }
+      |        }
+      |
+      |    def _assertEq(x: t, y: t): Unit \ Abort with Eq[t], ToString[t] = {
+      |        if (x == y) ()
+      |        else abort("${x} != ${y}")
+      |    }
+      |
+      |    def assertExpect(expect: {expect = t}, actual: t): Unit \ Abort with Eq[t], ToString[t] = {
+      |        if (expect#expect == actual) ()
+      |        else abort("found ${actual} but expected ${expect#expect}")
+      |    }
+      |
+      |    def runTest(
+      |        tests: Int32, seed: Int64, prop: c -> Unit \ Abort
+      |    ): Bool \ IO + (Collectable.Aef[c] - Abort - Random)
+      |    with Collectable[c] where Collectable.Elm[c] ~ Int32 = region local {
+      |        let f = () ->
+      |            ListSetGenerator.randomIterator(local, tests) |>
+      |                Iterator.forEach(prop);
+      |        let g = () -> runCrash(f);
+      |        Random.runWithSeed(seed, g)
+      |    }
+      |
+      |    pub def testInsertRedundant(): Bool \ IO = {
+      |        def prop(l) = {
+      |            let s1 = ListSet.fromIterable(l);
+      |            let s2 = l |>
+      |                List.head |>
+      |                Option.map(hd -> ListSet.insert(hd, s1)) |>
+      |                Option.getWithDefault(s1);
+      |            assertExpect(expect = s1, s2)
+      |        };
+      |        prop |> runTest(1_000, -6859625i64)
+      |    }
+      |
+      |}
+      |
+      |pub def runBenchmark(): Unit \ IO = {
+      |    JonathanStarup.Test.Property.TestListSet.testInsertRedundant() |> blackhole
+      |}
       |""".stripMargin
   }
 
