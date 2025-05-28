@@ -109,6 +109,7 @@ object BenchmarkInliner {
   private val MacroBenchmarks: Map[String, String] = Map(
     "ANSITerminal" -> ansiTerminal,
     "FordFulkerson" -> fordFulkerson,
+    "FlixJson" -> flixJson,
     "FloydWarshall" -> floydWarshall,
     "IDE" -> ide,
     "IFDS" -> ifds,
@@ -3701,6 +3702,10 @@ object BenchmarkInliner {
 
   private def talpin1992: String = {
     Files.lines(Path.of("./Talpin1992.flix").normalize()).toArray.mkString("\n")
+  }
+
+  private def flixJson: String = {
+    Files.lines(Path.of("./FlixJson.flix").normalize()).toArray.mkString("\n")
   }
 
   private def Python: String =
