@@ -186,7 +186,7 @@ object BenchmarkInliner {
        |bash $benchmarkScriptPath
        |
        |echo "Zipping output"
-       |zip -r build.zip $baseDir
+       |zip -r build.zip $benchOutputPath
        |
        |echo "Done"
        |
