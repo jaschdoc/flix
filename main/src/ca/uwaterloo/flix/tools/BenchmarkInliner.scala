@@ -2017,7 +2017,7 @@ object BenchmarkInliner {
       |}
       |
       |def runBenchmark(): Unit \ IO = {
-      |    println("Running IDE");
+      |    blackhole("Running IDE");
       |
       |    let cfg =
       |        ("smain","n1") ::
@@ -2870,7 +2870,7 @@ object BenchmarkInliner {
       |    def runCrash(f: Unit -> Unit \ ef): Bool \ ef + IO - Abort =
       |        run {f(); true} with handler Abort {
       |            def abort(msg, _) = {
-      |                println("Test failed: ${msg}");
+      |                blackhole("Test failed: ${msg}");
       |                false
       |            }
       |        }
