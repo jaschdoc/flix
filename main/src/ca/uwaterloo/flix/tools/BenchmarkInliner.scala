@@ -158,11 +158,12 @@ object BenchmarkInliner {
   def generateSetup(opts: Options, suite: Suite, asprofPath: Option[String]): Unit = {
     println("Generating setup...")
 
-    val programs = programsFromSuite(suite)
-    // val programs = Map(
-    //   "IDE" -> ide,
-    //   "IFDS" -> ifds,
-    // )
+    // val programs = programsFromSuite(suite)
+    val programs = Map(
+      "IDE" -> ide,
+      "IFDS" -> ifds,
+      "FlixJson" -> flixJson,
+    )
 
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
