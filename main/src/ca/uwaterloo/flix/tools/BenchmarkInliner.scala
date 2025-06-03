@@ -199,7 +199,7 @@ object BenchmarkInliner {
 
     println("Benchmarking compilation...")
     val t0 = System.nanoTime()
-    val benchmarks = runBenchmarking(programs, opts.copy(entryPoint = Some(Symbol.mkDefnSym("runBenchmark"))))
+    val benchmarks = runBenchmarking(programs, opts)
     val filePath = benchOutputPath.resolve(outFileName).normalize()
     FileOps.writeJSON(filePath, benchmarks)
 
@@ -427,12 +427,14 @@ object BenchmarkInliner {
     val compilationTimings = scala.collection.mutable.ListBuffer.empty[(Long, List[(String, Long)])]
     var usedTime = 0L
     var result: Option[CompilationResult] = None
+    val mainProgEmpty = mainProg("")
     while (usedTime < maxNanos) {
       val t0 = System.nanoTime()
       val flix = new Flix().setOptions(o)
       ZhegalkinCache.clearCaches()
       flix.addSourceCode(s"$name", prog)
-      flix.addSourceCode(s"blackhole", blackhole)
+      flix.addSourceCode("mainProg", mainProgEmpty)
+      flix.addSourceCode("blackHole", blackhole)
       val compilationResult = flix.compile().unsafeGet
       val phaseTimes = flix.phaseTimers.map { case PhaseTime(phase, time) => phase -> time }.toList
       val timing = (compilationResult.totalTime, phaseTimes)
@@ -587,7 +589,7 @@ object BenchmarkInliner {
        |
        |    discard bench(0i64, minutesToNanos(warmupTime), List.empty());
        |    let samples = bench(0i64, minutesToNanos(benchTime), List.empty());
-       |    let json = toJSON(samples);
+       |    let json = toJSONMain(samples);
        |
        |    Console.println(ToString.toString(json));
        |    Console.eprintln("Done")
@@ -607,65 +609,65 @@ object BenchmarkInliner {
        |}
        |
        |
-       |def toJSON(samples: List[Int64]): JSON = {
-       |    JSON.Obj(
+       |def toJSONMain(samples: List[Int64]): JSONMain = {
+       |    JSONMain.Obj(
        |        List#{
        |            ("baseline",
-       |                JVal.Lit(Lit.Str("$baselineFilePath"))
+       |                JSONMainJVal.JSONMainLit(JSONMainLit.Str("$baselineFilePath"))
        |            ),
        |            ("samples",
-       |                JVal.Arr(List.toVector(samples) |> Vector.map(n -> JVal.Lit(Lit.Num(n))))
+       |                JSONMainJVal.Arr(List.toVector(samples) |> Vector.map(n -> JSONMainJVal.JSONMainLit(JSONMainLit.Num(n))))
        |            )
        |        }
        |    )
        |}
        |
-       |enum JSON {
-       |    case Obj(List[(String, JVal)])
+       |enum JSONMain {
+       |    case Obj(List[(String, JSONMainJVal)])
        |}
        |
-       |enum JVal {
-       |    case Obj(JSON)
-       |    case Arr(Vector[JVal])
-       |    case Lit(Lit)
+       |enum JSONMainJVal {
+       |    case Obj(JSONMain)
+       |    case Arr(Vector[JSONMainJVal])
+       |    case JSONMainLit(JSONMainLit)
        |}
        |
-       |enum Lit {
+       |enum JSONMainLit {
        |    case Str(String)
        |    case Num(Int64)
        |    case Null
        |}
        |
-       |instance ToString[JSON] {
-       |    pub def toString(x: JSON): String = match x {
-       |        case JSON.Obj(kvs) =>
+       |instance ToString[JSONMain] {
+       |    pub def toString(x: JSONMain): String = match x {
+       |        case JSONMain.Obj(kvs) =>
        |            let str = kvs
-       |                |> List.map(match (k, v) -> "$${JSON.quote(k)}:$${ToString.toString(v)}")
+       |                |> List.map(match (k, v) -> "$${JSONMain.quote(k)}:$${ToString.toString(v)}")
        |                |> List.join(",");
        |            "{$${str}}"
        |    }
        |}
        |
        |
-       |instance ToString[JVal] {
-       |    pub def toString(x: JVal): String = match x {
-       |        case JVal.Obj(obj) => ToString.toString(obj)
-       |        case JVal.Arr(arr) => "[$${Vector.join(",", arr)}]"
-       |        case JVal.Lit(lit) => ToString.toString(lit)
+       |instance ToString[JSONMainJVal] {
+       |    pub def toString(x: JSONMainJVal): String = match x {
+       |        case JSONMainJVal.Obj(obj) => ToString.toString(obj)
+       |        case JSONMainJVal.Arr(arr) => "[$${Vector.join(",", arr)}]"
+       |        case JSONMainJVal.JSONMainLit(lit) => ToString.toString(lit)
        |    }
        |}
        |
        |
-       |instance ToString[Lit] {
-       |    pub def toString(x: Lit): String = match x {
-       |        case Lit.Str(s) => JSON.quote(s)
-       |        case Lit.Num(n) => Int64.toString(n)
-       |        case Lit.Null   => "null"
+       |instance ToString[JSONMainLit] {
+       |    pub def toString(x: JSONMainLit): String = match x {
+       |        case JSONMainLit.Str(s) => JSONMain.quote(s)
+       |        case JSONMainLit.Num(n) => Int64.toString(n)
+       |        case JSONMainLit.Null   => "null"
        |    }
        |}
        |
        |
-       |mod JSON {
+       |mod JSONMain {
        |    pub def quote(s: String): String = {
        |        let escaped = s
        |            |> String.replace(src = "\\\\", dst = "\\\\\\\\")
