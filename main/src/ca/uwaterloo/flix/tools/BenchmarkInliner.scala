@@ -159,6 +159,10 @@ object BenchmarkInliner {
     println("Generating setup...")
 
     val programs = programsFromSuite(suite)
+    // val programs = Map(
+    //   "IDE" -> ide,
+    //   "IFDS" -> ifds,
+    // )
 
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
