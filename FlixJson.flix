@@ -442,6 +442,7 @@ mod Json {
         }
     }
 }
+
 mod Json.Parse {
     import java.lang.NumberFormatException
     import java.lang.Integer
@@ -677,6 +678,7 @@ mod Json.Parse {
     }
 
 }
+
 mod Json.Path {
     use Json.JsonElement.JsonArray;
     use Json.JsonElement.JsonObject;
@@ -837,6 +839,7 @@ mod Json.Write {
         case JsonNull => "null"
     }
 }
+
 mod TestReadme {
     use Json.ToJson
     use Json.FromJson;
@@ -923,8 +926,6 @@ mod TestReadme {
             ToJson.toJson(map)
         }
     }
-
-
 
     pub def testReadmeParse(): Bool = {
         let string = "{\r\n  \"name\": \"Alice\",\r\n  \"age\": 30,\r\n  \"address\": {\r\n    \"city\": \"New York\",\r\n    \"zip\": \"10001\"\r\n  },\r\n  \"contact\": {\r\n    \"email\": \"alice@example.com\",\r\n    \"phone\": \"123-456-7890\"\r\n  }\r\n}";
