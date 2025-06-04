@@ -195,17 +195,42 @@ object BenchmarkInliner {
     val programs = programsFromSuite(suite)
     val outFileName = outFileFromSuite(suite)
 
+    println("Validating programs...")
+    preValidatePrograms(programs, opts)
+    println(
+      """***********************************
+        |* VALIDATION SUCCESS              *
+        |***********************************
+        |""".stripMargin)
     println("Benchmarking compilation...")
     val t0 = System.nanoTime()
     val benchmarks = runBenchmarking(programs, opts)
     val filePath = benchOutputPath.resolve(outFileName).normalize()
     FileOps.writeJSON(filePath, benchmarks)
-
-    println(s"Done. Results written to '$filePath'")
+    println(
+      """***********************************
+        |* BENCHMARKING SUCCESS            *
+        |***********************************
+        |""".stripMargin)
+    println(s"Results written to '$filePath'")
 
     val tDelta = System.nanoTime() - t0
     val seconds = nanosToMinutes(tDelta)
     println(s"Took $seconds minutes total")
+  }
+
+  private def preValidatePrograms(programs: Map[String, String], opts: Options): Unit = {
+    val confs = mkConfigurations(opts).flatMap(o => programs.map { case (name, prog) => (o, name, prog) })
+    implicit val sctx: SecurityContext = SecurityContext.AllPermissions
+    val mainProgEmpty = mainProg("")
+    for ((o, name, prog) <- confs) {
+      debug(s"Checking $name with optimizer ${if (o.xnooptimizer) "disabled" else "enabled"}")
+      val flix = new Flix().setOptions(o)
+      flix.addSourceCode(s"$name", prog)
+      flix.addSourceCode("mainProg", mainProgEmpty)
+      flix.addSourceCode("blackHole", blackhole)
+      flix.compile().unsafeGet
+    }
   }
 
   private def outFileFromSuite(suite: Suite): String = {
