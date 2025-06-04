@@ -114,7 +114,7 @@ object BenchmarkInliner {
   private val MacroBenchmarks: Map[String, String] = Map(
     "ANSITerminal" -> ansiTerminal,
     "FordFulkerson" -> fordFulkerson,
-    "FlixJson" -> flixJson,
+    // "FlixJson" -> flixJson,
     "FloydWarshall" -> floydWarshall,
     "IDE" -> ide,
     "IFDS" -> ifds,
@@ -156,12 +156,7 @@ object BenchmarkInliner {
   def generateSetup(opts: Options, suite: Suite, asprofPath: Option[String]): Unit = {
     println("Generating setup...")
 
-    // val programs = programsFromSuite(suite)
-    val programs = Map(
-      "IDE" -> ide,
-      "IFDS" -> ifds,
-      "FlixJson" -> flixJson,
-    )
+    val programs = Map.empty[String, String] // programsFromSuite(suite)
 
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
