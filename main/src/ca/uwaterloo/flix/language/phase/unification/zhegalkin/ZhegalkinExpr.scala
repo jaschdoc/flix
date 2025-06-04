@@ -22,33 +22,27 @@ import scala.collection.mutable
 /** Companion object for [[ZhegalkinExpr]] */
 object ZhegalkinExpr {
 
-  /** A Zhegalkin expression that represents the empty set, i.e. the zero element of the algebra. */
-  val zero: ZhegalkinExpr = ZhegalkinExpr(ZhegalkinCst.empty, Nil)
-
-  /** A Zhegalkin expression that represents the universe, i.e. the one element of the algebra. */
-  val one: ZhegalkinExpr = ZhegalkinExpr(ZhegalkinCst.universe, Nil)
-
   /**
     * A smart constructor for Zhegalkin expressions that filters empty intersections.
     *
     * A Zhegalkin expression is of the form: c ⊕ t1 ⊕ t2 ⊕ ... ⊕ tn
     */
-  def mkZhegalkinExpr(cst: ZhegalkinCst, terms: List[ZhegalkinTerm]): ZhegalkinExpr = (cst, terms) match {
-    case (ZhegalkinCst.empty, Nil) => ZhegalkinExpr.zero
-    case (ZhegalkinCst.universe, Nil) => ZhegalkinExpr.one
+  def mkZhegalkinExpr[T](cst: ZhegalkinCst[T], terms: List[ZhegalkinTerm[T]])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = (cst, terms) match {
+    case (alg.empty, Nil) => alg.zero
+    case (alg.universe, Nil) => alg.one
     case _ =>
       // Construct a new polynomial.
 
       // Compute non-empty terms (i.e. terms where the coefficient is non-empty).
-      val ts = terms.filter(t => !t.cst.s.isEmpty)
+      val ts = terms.filter(t => !t.cst.isEmpty()(dom))
 
       // Special case: If ts is empty then this could be 0 or 1.
       if (ts.isEmpty) {
-        if (cst eq ZhegalkinCst.empty) {
-          return ZhegalkinExpr.zero
+        if (cst eq alg.empty) {
+          return alg.zero
         }
-        if (cst eq ZhegalkinCst.universe) {
-          return ZhegalkinExpr.one
+        if (cst eq alg.universe) {
+          return alg.one
         }
       }
 
@@ -57,34 +51,43 @@ object ZhegalkinExpr {
   }
 
   /** Returns a Zhegalkin expression that represents a single variable, i.e. x ~~ Ø ⊕ (𝓤 ∩ x) */
-  def mkVar(x: ZhegalkinVar): ZhegalkinExpr = ZhegalkinExpr(ZhegalkinCst.empty, List(ZhegalkinTerm(ZhegalkinCst.universe, SortedSet(x))))
+  def mkVar[T](x: ZhegalkinVar)(implicit alg: ZhegalkinAlgebra[T]): ZhegalkinExpr[T] = ZhegalkinExpr(alg.empty, List(ZhegalkinTerm(alg.universe, SortedSet(x))))
 
   /**
     * Returns `true` if the given Zhegalkin expression `e` represents the empty set.
     *
     * Note: The representation of Zhegalkin polynomials is unique, hence we can use a simple equality check here.
     */
-  def isEmpty(e: ZhegalkinExpr): Boolean = e == ZhegalkinExpr.zero
+  def isEmpty[T](e: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T]): Boolean = e == alg.zero
 
   /**
     * Returns the complement of the given Zhegalkin expression `e`.
     *
     * Uses identity laws to speed up the computation.
     */
-  def mkCompl(e: ZhegalkinExpr): ZhegalkinExpr = {
+  def mkCompl[T](e: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     // ¬Ø = 𝓤
-    if (e eq ZhegalkinExpr.zero) {
-      return ZhegalkinExpr.one
+    if (e eq alg.zero) {
+      return alg.one
     }
 
     // Performance: A common case.
     // Ø ⊕ (𝓤 ∩ x1 ∩ ...) ⊕ (𝓤 ∩ x2 ∩ ...) --> 𝓤 ⊕ (𝓤 ∩ x1 ∩ ...) ⊕ (𝓤 ∩ x2 ∩ ...)
-    if ((e.cst eq ZhegalkinCst.empty) && e.terms.forall(t => t.cst eq ZhegalkinCst.universe)) {
-      return e.copy(cst = ZhegalkinCst.universe)
+    if ((e.cst eq alg.empty) && e.terms.forall(t => t.cst eq alg.universe)) {
+      return e.copy(cst = alg.universe)
     }
 
     // ¬a = 1 ⊕ a
-    mkXor(ZhegalkinExpr.one, e)
+    mkXor(alg.one, e)
+  }
+
+  /**
+    * Returns the xor of the two given Zhegalkin constants `c1` and `c2`.
+    * */
+  def mkXor[T](c1: ZhegalkinCst[T], c2: ZhegalkinCst[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinCst[T] = {
+    // Note: use of union, inter, compl ensures a canonical representation.
+    // a ⊕ b = (a ∪ b) - (a ∩ b) = (a ∪ b) ∩ ¬(a ∩ b)
+    c1.union(c2).inter(c1.inter(c2).compl()(alg, dom))
   }
 
   /**
@@ -92,18 +95,18 @@ object ZhegalkinExpr {
     *
     * Uses identity laws and caching to speed up the computation.
     */
-  def mkXor(z1: ZhegalkinExpr, z2: ZhegalkinExpr): ZhegalkinExpr = {
+  def mkXor[T](z1: ZhegalkinExpr[T], z2: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     // 0 ⊕ a = a
-    if (z1 eq ZhegalkinExpr.zero) {
+    if (z1 eq alg.zero) {
       return z2
     }
     // a ⊕ 0 = a
-    if (z2 eq ZhegalkinExpr.zero) {
+    if (z2 eq alg.zero) {
       return z1
     }
 
     // Perform a cache lookup or an actual computation.
-    ZhegalkinCache.lookupOrComputeXor(z1, z2, computeXor)
+    alg.Cache.lookupOrComputeXor(z1, z2, computeXor)
   }
 
   /**
@@ -111,13 +114,13 @@ object ZhegalkinExpr {
     *
     * Does not use any simplification rules nor any cache.
     */
-  private def computeXor(e1: ZhegalkinExpr, e2: ZhegalkinExpr): ZhegalkinExpr = (e1, e2) match {
+  private def computeXor[T](e1: ZhegalkinExpr[T], e2: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = (e1, e2) match {
     case (ZhegalkinExpr(c1, ts1), ZhegalkinExpr(c2, ts2)) =>
-      val c = ZhegalkinCst.mkXor(c1, c2)
+      val c = mkXor(c1, c2)
       // Eliminate duplicates: a ⊕ a = 0
 
       // We want to retain all terms that occur an odd number of times.
-      val seen = mutable.Set.empty[ZhegalkinTerm]
+      val seen = mutable.Set.empty[ZhegalkinTerm[T]]
       for (t <- ts1.iterator ++ ts2.iterator) {
         if (seen.contains(t)) {
           // The term is already there, so we remove it, since we have seen it an even number of times.
@@ -132,8 +135,8 @@ object ZhegalkinExpr {
       val termsGroupedByVarSet = allTermsNonDup.groupBy(_.vars).toList
       val mergedTerms = termsGroupedByVarSet.map {
         case (vars, l) =>
-          val mergedCst: ZhegalkinCst = l.foldLeft(ZhegalkinCst.empty) { // Neutral element for Xor.
-            case (acc, t) => ZhegalkinCst.mkXor(acc, t.cst) // Distributive law: (c1 ∩ A) ⊕ (c2 ∩ A) = (c1 ⊕ c2) ∩ A.
+          val mergedCst: ZhegalkinCst[T] = l.foldLeft(alg.empty) { // Neutral element for Xor.
+            case (acc, t) => mkXor(acc, t.cst) // Distributive law: (c1 ∩ A) ⊕ (c2 ∩ A) = (c1 ⊕ c2) ∩ A.
           }
           ZhegalkinTerm(mergedCst, vars)
       }
@@ -145,23 +148,23 @@ object ZhegalkinExpr {
     *
     * Uses identity laws to speed up the computation.
     */
-  def mkUnion(e1: ZhegalkinExpr, e2: ZhegalkinExpr): ZhegalkinExpr = {
+  def mkUnion[T](e1: ZhegalkinExpr[T], e2: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     // Ø ∪ a = a
-    if (e1 eq ZhegalkinExpr.zero) {
+    if (e1 eq alg.zero) {
       return e2
     }
     // a ∪ Ø = a
-    if (e2 eq ZhegalkinExpr.zero) {
+    if (e2 eq alg.zero) {
       return e1
     }
 
-    ZhegalkinCache.lookupOrComputeUnion(e1, e2, computeUnion)
+    alg.Cache.lookupOrComputeUnion(e1, e2, computeUnion)
   }
 
   /**
     * Computes the union of the given two Zhegalkin expressions `e1` and `e2`.
     */
-  private def computeUnion(e1: ZhegalkinExpr, e2: ZhegalkinExpr): ZhegalkinExpr = {
+  private def computeUnion[T](e1: ZhegalkinExpr[T], e2: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     // a ∪ b = 1 ⊕ (1 ⊕ a)(1 ⊕ b)
     //mkXor(ZhegalkinExpr.one, mkInter(mkXor(ZhegalkinExpr.one, e1), mkXor(ZhegalkinExpr.one, e2)))
 
@@ -174,26 +177,26 @@ object ZhegalkinExpr {
     *
     * Uses identity laws to speed up the computation.
     */
-  def mkInter(e1: ZhegalkinExpr, e2: ZhegalkinExpr): ZhegalkinExpr = {
+  def mkInter[T](e1: ZhegalkinExpr[T], e2: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     // Ø ∩ a = Ø
-    if (e1 eq ZhegalkinExpr.zero) {
-      return ZhegalkinExpr.zero
+    if (e1 eq alg.zero) {
+      return alg.zero
     }
     // a ∩ Ø = Ø
-    if (e2 eq ZhegalkinExpr.zero) {
-      return ZhegalkinExpr.zero
+    if (e2 eq alg.zero) {
+      return alg.zero
     }
     // 𝓤 ∩ a = a
-    if (e1 eq ZhegalkinExpr.one) {
+    if (e1 eq alg.one) {
       return e2
     }
     // a ∩ 𝓤 = a
-    if (e2 eq ZhegalkinExpr.one) {
+    if (e2 eq alg.one) {
       return e1
     }
 
     // Perform a cache lookup or an actual computation.
-    ZhegalkinCache.lookupOrComputeInter(e1, e2, computeInter)
+    alg.Cache.lookupOrComputeInter(e1, e2, computeInter)
   }
 
   /**
@@ -207,7 +210,7 @@ object ZhegalkinExpr {
     *       ⊕ ...
     * }}}
     */
-  private def computeInter(e1: ZhegalkinExpr, e2: ZhegalkinExpr): ZhegalkinExpr = e1 match {
+  private def computeInter[T](e1: ZhegalkinExpr[T], e2: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = e1 match {
     case ZhegalkinExpr(c1, ts1) =>
       val zero = mkInterConstantExpr(c1, e2)
       ts1.foldLeft(zero) {
@@ -218,9 +221,9 @@ object ZhegalkinExpr {
   /**
     * Computes the intersection of the given Zhegalkin constant `c` and the given Zhegalkin expression `e`.
     */
-  private def mkInterConstantExpr(c: ZhegalkinCst, e: ZhegalkinExpr): ZhegalkinExpr = {
+  private def mkInterConstantExpr[T](c: ZhegalkinCst[T], e: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     // Perform a cache lookup or an actual computation.
-    ZhegalkinCache.lookupOrComputeInterCst(c, e, computeInterConstantExpr)
+    alg.Cache.lookupOrComputeInterCst(c, e, computeInterConstantExpr)
   }
 
   /**
@@ -230,7 +233,7 @@ object ZhegalkinExpr {
     *   c ∩ (c2 ⊕ t21 ⊕ t22 ⊕ ... ⊕ t2m) = (c ∩ c2) ⊕ (c ∩ t21) ⊕ (c ∩ t22) ⊕ ... ⊕ (c ∩ t2m)
     * }}}
     */
-  private def computeInterConstantExpr(c: ZhegalkinCst, e: ZhegalkinExpr): ZhegalkinExpr = e match {
+  private def computeInterConstantExpr[T](c: ZhegalkinCst[T], e: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = e match {
     case ZhegalkinExpr(c2, terms) =>
       val ts = terms.map(t => mkInterConstantTerm(c, t))
       mkZhegalkinExpr(c.inter(c2), ts)
@@ -243,7 +246,7 @@ object ZhegalkinExpr {
     *   c ∩ (c2 ∩ x1 ∩ x2 ∩ ... ∩ xn) = (c ∩ c2) ∩ x1 ∩ x2 ∩ ... ∩ xn)
     * }}}
     */
-  private def mkInterConstantTerm(c: ZhegalkinCst, t: ZhegalkinTerm): ZhegalkinTerm = t match {
+  private def mkInterConstantTerm[T](c: ZhegalkinCst[T], t: ZhegalkinTerm[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinTerm[T] = t match {
     case ZhegalkinTerm(c2, vars) =>
       if (c == c2) {
         return t
@@ -260,11 +263,11 @@ object ZhegalkinExpr {
     * }}}
     *
     */
-  private def mkInterTermExpr(t: ZhegalkinTerm, e: ZhegalkinExpr): ZhegalkinExpr = e match {
+  private def mkInterTermExpr[T](t: ZhegalkinTerm[T], e: ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = e match {
     case ZhegalkinExpr(c2, terms) =>
-      val zero: ZhegalkinExpr = mkZhegalkinExpr(ZhegalkinCst.empty, List(mkInterConstantTerm(c2, t)))
+      val zero: ZhegalkinExpr[T] = mkZhegalkinExpr(alg.empty, List(mkInterConstantTerm(c2, t)))
       terms.foldLeft(zero) {
-        case (acc, t2) => mkXor(acc, mkZhegalkinExpr(ZhegalkinCst.empty, List(mkInterTermTerm(t, t2))))
+        case (acc, t2) => mkXor(acc, mkZhegalkinExpr(alg.empty, List(mkInterTermTerm(t, t2))))
       }
   }
 
@@ -276,7 +279,7 @@ object ZhegalkinExpr {
     * }}}
     */
   //
-  private def mkInterTermTerm(t1: ZhegalkinTerm, t2: ZhegalkinTerm): ZhegalkinTerm = {
+  private def mkInterTermTerm[T](t1: ZhegalkinTerm[T], t2: ZhegalkinTerm[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinTerm[T] = {
     // a ∩ a = a
     if (t1 eq t2) {
       return t1
@@ -302,7 +305,7 @@ object ZhegalkinExpr {
 }
 
 /** Represents a Zhegalkin expr: c ⊕ t1 ⊕ t2 ⊕ ... ⊕ tn */
-case class ZhegalkinExpr(cst: ZhegalkinCst, terms: List[ZhegalkinTerm]) {
+case class ZhegalkinExpr[T](cst: ZhegalkinCst[T], terms: List[ZhegalkinTerm[T]]) {
 
   // Representation Invariants:
   //  if (this == ZhegalkinExpr.zero) {
@@ -327,7 +330,7 @@ case class ZhegalkinExpr(cst: ZhegalkinCst, terms: List[ZhegalkinTerm]) {
     * }}}
     *
     */
-  def map(f: Int => ZhegalkinExpr): ZhegalkinExpr = {
+  def map(f: Int => ZhegalkinExpr[T])(implicit alg: ZhegalkinAlgebra[T], dom: Domain[T]): ZhegalkinExpr[T] = {
     if (terms == Nil) {
       return this
     }
@@ -341,7 +344,7 @@ case class ZhegalkinExpr(cst: ZhegalkinCst, terms: List[ZhegalkinTerm]) {
     * Returns `true` if `this` is equal to `that`.
     */
   override def equals(obj: Any): Boolean = obj match {
-    case that: ZhegalkinExpr => (this eq that) || (this.cst == that.cst && this.terms == that.terms)
+    case that: ZhegalkinExpr[_] => (this eq that) || (this.cst == that.cst && this.terms == that.terms)
     case _ => false
   }
 
