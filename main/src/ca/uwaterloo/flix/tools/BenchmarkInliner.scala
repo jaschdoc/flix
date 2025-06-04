@@ -17,8 +17,6 @@ package ca.uwaterloo.flix.tools
 
 import ca.uwaterloo.flix.api.{Flix, PhaseTime}
 import ca.uwaterloo.flix.language.ast.shared.SecurityContext
-import ca.uwaterloo.flix.language.ast.Symbol
-import ca.uwaterloo.flix.language.phase.unification.zhegalkin.ZhegalkinCache
 import ca.uwaterloo.flix.runtime.CompilationResult
 import ca.uwaterloo.flix.util.StatUtils.{average, median}
 import ca.uwaterloo.flix.util.collection.ListMap
@@ -436,7 +434,6 @@ object BenchmarkInliner {
     while (usedTime < maxNanos) {
       val t0 = System.nanoTime()
       val flix = new Flix().setOptions(o)
-      ZhegalkinCache.clearCaches()
       flix.addSourceCode(s"$name", prog)
       flix.addSourceCode("mainProg", mainProgEmpty)
       flix.addSourceCode("blackHole", blackhole)
