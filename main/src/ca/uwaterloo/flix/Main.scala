@@ -105,6 +105,7 @@ object Main {
       XPerfN = cmdOpts.XPerfN,
       xchaosMonkey = cmdOpts.xchaosMonkey,
       xiterations = cmdOpts.xiterations,
+      xnooptimizer = false
     )
 
     // Don't use progress bar if benchmarking.
@@ -315,6 +316,12 @@ object Main {
         case Command.CompilerMemory =>
           CompilerMemory.run(options)
 
+        case Command.SetupInlinerBenchmark(asprofPath) =>
+          BenchmarkInliner.generateSetup(options.copy(progress = false), cmdOpts.benchmarkSuite, asprofPath)
+
+        case Command.RunInlinerBenchmark =>
+          BenchmarkInliner.runCompilerBenchmark(options.copy(progress = false), cmdOpts.benchmarkSuite)
+
         case Command.Zhegalkin =>
           ZhegalkinPerf.run(options.XPerfN)
 
@@ -358,7 +365,9 @@ object Main {
                      XPerfPar: Boolean = false,
                      xchaosMonkey: Boolean = false,
                      xiterations: Int = 1000,
-                     files: Seq[File] = Seq())
+                     files: Seq[File] = Seq(),
+                     benchmarkSuite: BenchmarkInliner.Suite = BenchmarkInliner.Suite.Micro
+                    )
 
   /**
     * A case class representing possible commands.
@@ -403,6 +412,9 @@ object Main {
 
     case object Zhegalkin extends Command
 
+    case class SetupInlinerBenchmark(asprofPath: Option[String]) extends Command
+
+    case object RunInlinerBenchmark extends Command
   }
 
   /**
@@ -485,6 +497,44 @@ object Main {
           .action((v, c) => c.copy(XPerfN = Some(v)))
           .text("number of compilations")
       ).hidden()
+
+      cmd("benchmark-inliner-compiler").action((_, c) => c.copy(command = Command.RunInlinerBenchmark))
+        .text("Benchmark compilation for inliner")
+        .children(
+          opt[String]("suite")
+            .action {
+              case (value, c) => value.toLowerCase match {
+                case "micro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Micro)
+                case "medium" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Medium)
+                case "macro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Macro)
+                case "all" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.All)
+                case _ => c
+              }
+            }
+            .text("the suite of programs to run ('micro', 'medium', 'macro', 'all') - default is 'micro'")
+        )
+
+      cmd("setup-inliner-benchmark").action((_, c) => c.copy(command = Command.SetupInlinerBenchmark(None)))
+        .text("Sets up inliner experiments")
+        .children(
+          opt[String]("asprof")
+            .action {
+              case (value, c) if value.isBlank => c.copy(command = Command.SetupInlinerBenchmark(None))
+              case (value, c) => c.copy(command = Command.SetupInlinerBenchmark(Some(value)))
+            }
+            .text("path to async-profiler shared library (leave blank if you do not want to attach)"),
+          opt[String]("suite")
+            .action {
+              case (value, c) => value.toLowerCase match {
+                case "micro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Micro)
+                case "medium" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Medium)
+                case "macro" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.Macro)
+                case "all" => c.copy(benchmarkSuite = BenchmarkInliner.Suite.All)
+                case _ => c
+              }
+            }
+            .text("the suite of programs to run ('micro', 'medium', 'macro', 'all') - default is 'micro'")
+        )
 
       note("")
 

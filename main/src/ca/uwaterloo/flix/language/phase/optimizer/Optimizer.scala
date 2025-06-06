@@ -30,6 +30,9 @@ object Optimizer {
     * Returns an optimized version of the given AST `root`.
     */
   def run(root: MonoAst.Root)(implicit flix: Flix): MonoAst.Root = flix.phase("Optimizer") {
+    if (flix.options.xnooptimizer) {
+      return root
+    }
     var currentRoot = root
     var currentDelta = currentRoot.defs.keys.toSet
     for (_ <- 0 until MaxRounds) {
@@ -42,5 +45,4 @@ object Optimizer {
     }
     currentRoot
   }
-
 }
