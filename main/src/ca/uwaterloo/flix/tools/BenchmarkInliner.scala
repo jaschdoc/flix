@@ -424,7 +424,7 @@ object BenchmarkInliner {
   private def mkConfigurations(opts: Options): List[Options] = {
     val o0 = opts.copy(xnooptimizer = true, lib = LibLevel.All, progress = false, incremental = false)
     val o1 = o0.copy(xnooptimizer = false)
-    o0 :: o1 :: Nil
+    o1 :: Nil
   }
 
   private def benchmarkWithIndividualMaxTime(runConfigs: List[(Options, String, String)], maxWarmupNanos: Long, maxNanos: Long): ListMap[String, Run] = {
