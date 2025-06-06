@@ -301,8 +301,8 @@ object BenchmarkInliner {
 
   private case class BenchmarkFile(private val name: String, private val opts: Options) {
     private val FileName: String = {
-      val suffix = if (opts.xnooptimizer) "disabled" else "enabled"
-      s"${name}_$suffix"
+      // val suffix = if (opts.xnooptimizer) "disabled" else "enabled"
+      s"${name}_static_method_call"
     }
     private val JarName: String = s"$FileName.jar"
     val BuildDir: Path = classDirFor(s"$FileName/")
@@ -314,7 +314,7 @@ object BenchmarkInliner {
 
   private object BenchmarkFile {
     def BaselineFile(file: BenchmarkFile): Path = {
-      val baseOpts = file.opts.copy(xnooptimizer = true)
+      val baseOpts = file.opts.copy(xnooptimizer = false)
       BenchmarkFile(file.name, baseOpts).OutputFile
     }
   }
