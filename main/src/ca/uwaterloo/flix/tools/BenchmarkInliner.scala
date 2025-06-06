@@ -347,7 +347,7 @@ object BenchmarkInliner {
   private def snd[A, B](x: (A, B)): B = x._2
 
   private def estimateTimeMinutes(programsCount: Int, warmupTime: Int, benchmarkTime: Int): Int = {
-    val timeCalc = (time: Int) => time * programsCount * 2
+    val timeCalc = (time: Int) => time * programsCount
     timeCalc(warmupTime) + timeCalc(benchmarkTime)
   }
 
