@@ -596,9 +596,9 @@ object BenchmarkInliner {
        |    def bench(usedNanos, maxNanos, samples, timings) = {
        |        if (usedNanos < maxNanos) {
        |            let (sample, newTimings) = doSampling(usedNanos, maxNanos, 0, List.empty());
-       |            bench(sample, maxNanos, (sample - usedNanos) :: samples, timings ::: newTimings)
+       |            bench(sample, maxNanos, (sample - usedNanos) :: samples, newTimings :: timings)
        |        } else {
-       |            (List.reverse(samples), timings)
+       |            (List.reverse(samples), List.reverse(timings) |> List.flatten)
        |        }
        |    };
        |
