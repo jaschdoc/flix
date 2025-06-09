@@ -54,13 +54,13 @@ object BenchmarkInliner {
 
   }
 
-  private val RunningTimeWarmupTime: Int = 10
+  private val RunningTimeWarmupTime: Int = 1
 
-  private val RunningTimeBenchmarkTime: Int = 10
+  private val RunningTimeBenchmarkTime: Int = 1
 
-  private val CompilationWarmupTime: Int = 10
+  private val CompilationWarmupTime: Int = 5
 
-  private val CompilationBenchmarkTime: Int = 10
+  private val CompilationBenchmarkTime: Int = 5
 
   private val NumberOfRuns: Int = 100_000
 
@@ -457,12 +457,12 @@ object BenchmarkInliner {
       flix.addSourceCode(s"$name", prog)
       flix.addSourceCode("mainProg", mainProgEmpty)
       flix.addSourceCode("blackHole", blackhole)
-      val compilationResult = flix.compile().unsafeGet
-      val phaseTimes = flix.phaseTimers.map { case PhaseTime(phase, time) => phase -> time }.toList
-      val timing = (compilationResult.totalTime, phaseTimes)
-      compilationTimings += timing
+      val compilationResult = flix.compile()
       usedTime += (System.nanoTime() - t0)
-      result = Some(compilationResult)
+      val phaseTimes = flix.phaseTimers.map { case PhaseTime(phase, time) => phase -> time }.toList
+      val timing = (compilationResult.unsafeGet.totalTime, phaseTimes)
+      compilationTimings += timing
+      result = Some(compilationResult.unsafeGet)
     }
     (compilationTimings.toSeq, result)
   }
@@ -582,23 +582,23 @@ object BenchmarkInliner {
        |    //
        |    // Benchmarking functions
        |    //
-       |    def doSampling(usedNanos, maxNanos, usedRuns) = {
+       |    def doSampling(usedNanos, maxNanos, usedRuns, timings) = {
        |        if (usedNanos < maxNanos and usedRuns < runs) {
        |            let t0 = System.nanoTime();
        |            runBenchmark();
        |            let tDelta = System.nanoTime() - t0;
-       |            doSampling(usedNanos + tDelta, maxNanos, usedRuns + 1)
+       |            doSampling(usedNanos + tDelta, maxNanos, usedRuns + 1, tDelta :: timings)
        |        } else {
-       |            usedNanos
+       |            (usedNanos, List.reverse(timings))
        |        }
        |    };
        |
-       |    def bench(usedNanos, maxNanos, samples) = {
+       |    def bench(usedNanos, maxNanos, samples, timings) = {
        |        if (usedNanos < maxNanos) {
-       |            let sample = doSampling(usedNanos, maxNanos, 0) - usedNanos;
-       |            bench(usedNanos + sample, maxNanos, sample :: samples)
+       |            let (sample, newTimings) = doSampling(usedNanos, maxNanos, 0, List.empty());
+       |            bench(sample, maxNanos, (sample - usedNanos) :: samples, timings ::: newTimings)
        |        } else {
-       |            List.reverse(samples)
+       |            (List.reverse(samples), timings)
        |        }
        |    };
        |
@@ -609,9 +609,9 @@ object BenchmarkInliner {
        |
        |    Console.eprintln("Warming up for $${warmupTime} minutes");
        |
-       |    discard bench(0i64, minutesToNanos(warmupTime), List.empty());
-       |    let samples = bench(0i64, minutesToNanos(benchTime), List.empty());
-       |    let json = toJSONMain(samples);
+       |    discard bench(0i64, minutesToNanos(warmupTime), List.empty(), List.empty());
+       |    let (samples, timings) = bench(0i64, minutesToNanos(benchTime), List.empty(), List.empty());
+       |    let json = toJSONMain(samples, timings);
        |
        |    Console.println(ToString.toString(json));
        |    Console.eprintln("Done")
@@ -631,7 +631,7 @@ object BenchmarkInliner {
        |}
        |
        |
-       |def toJSONMain(samples: List[Int64]): JSONMain = {
+       |def toJSONMain(samples: List[Int64], timings: List[Int64]): JSONMain = {
        |    JSONMain.Obj(
        |        List#{
        |            ("baseline",
@@ -639,6 +639,9 @@ object BenchmarkInliner {
        |            ),
        |            ("samples",
        |                JSONMainJVal.Arr(List.toVector(samples) |> Vector.map(n -> JSONMainJVal.JSONMainLit(JSONMainLit.Num(n))))
+       |            ),
+       |            ("timings",
+       |                JSONMainJVal.Arr(List.toVector(timings) |> Vector.map(n -> JSONMainJVal.JSONMainLit(JSONMainLit.Num(n))))
        |            )
        |        }
        |    )
