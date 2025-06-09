@@ -58,9 +58,9 @@ object BenchmarkInliner {
 
   private val RunningTimeBenchmarkTime: Int = 5
 
-  private val CompilationWarmupTime: Int = 10
+  private val CompilationWarmupTime: Int = 5
 
-  private val CompilationBenchmarkTime: Int = 10
+  private val CompilationBenchmarkTime: Int = 5
 
   private val NumberOfRuns: Int = 100_000
 
