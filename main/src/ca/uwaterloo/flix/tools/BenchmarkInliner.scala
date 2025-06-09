@@ -62,7 +62,7 @@ object BenchmarkInliner {
 
   private val CompilationBenchmarkTime: Int = 5
 
-  private val NumberOfRuns: Int = 100_000
+  private val NumberOfRuns: Int = 1000
 
   /**
     * Set this to `true` for additional details during benchmarking.
