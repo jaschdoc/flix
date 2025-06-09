@@ -54,9 +54,9 @@ object BenchmarkInliner {
 
   }
 
-  private val RunningTimeWarmupTime: Int = 10
+  private val RunningTimeWarmupTime: Int = 5
 
-  private val RunningTimeBenchmarkTime: Int = 10
+  private val RunningTimeBenchmarkTime: Int = 5
 
   private val CompilationWarmupTime: Int = 10
 
@@ -457,12 +457,12 @@ object BenchmarkInliner {
       flix.addSourceCode(s"$name", prog)
       flix.addSourceCode("mainProg", mainProgEmpty)
       flix.addSourceCode("blackHole", blackhole)
-      val compilationResult = flix.compile().unsafeGet
-      val phaseTimes = flix.phaseTimers.map { case PhaseTime(phase, time) => phase -> time }.toList
-      val timing = (compilationResult.totalTime, phaseTimes)
-      compilationTimings += timing
+      val compilationResult = flix.compile()
       usedTime += (System.nanoTime() - t0)
-      result = Some(compilationResult)
+      val phaseTimes = flix.phaseTimers.map { case PhaseTime(phase, time) => phase -> time }.toList
+      val timing = (compilationResult.unsafeGet.totalTime, phaseTimes)
+      compilationTimings += timing
+      result = Some(compilationResult.unsafeGet)
     }
     (compilationTimings.toSeq, result)
   }
