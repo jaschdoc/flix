@@ -261,8 +261,8 @@ object BenchmarkInliner {
     val configs = mkConfigurations(opts.copy(loadClassFiles = false))
       .flatMap(o => programs.map { case (name, (prog, runs)) => (o, name, prog, runs) })
     configs.foreach(buildAndWriteJar)
-    val snippets = configs.map {
-      case (o, name, _, _) => mkScriptSnippet(BenchmarkFile(name, o), asprofPath)
+    val snippets = configs.zipWithIndex.map {
+      case ((o, name, _, _), idx) => mkScriptSnippet(BenchmarkFile(name, o), asprofPath, idx, programs)
     }
     val script = mkScript(snippets)
     FileOps.writeString(benchmarkScriptPath, script)
@@ -324,9 +324,9 @@ object BenchmarkInliner {
     }
   }
 
-  private def mkScriptSnippet(file: BenchmarkFile, asprofPath: Option[String]): String = {
+  private def mkScriptSnippet(file: BenchmarkFile, asprofPath: Option[String], idx: Int, programs: Map[String, (String, Int)]): String = {
     s"""rm -f ${file.OutputFile}
-       |echo "Benchmarking ${file.JarFilePath}"
+       |echo "Benchmarking ${file.JarFilePath} (${idx + 1 + programs.size} / ${programs.size * 2} / ${programs.size * 2})"
        |java ${asprofPath.map(p => s"-agentpath:$p=start,fmt=collapsed,event=alloc,file=${file.ProfilingOutFile}").getOrElse("")} -jar ${file.JarFilePath} >> ${file.OutputFile}
        |""".stripMargin
   }
