@@ -118,6 +118,7 @@ object BenchmarkInliner {
     "FordFulkerson" -> fordFulkerson,
     // "FlixJson" -> flixJson,
     "FloydWarshall" -> floydWarshall,
+    "FullyConnected" -> fullyConnected,
     "IDE" -> ide,
     "IFDS" -> ifds,
     "Interpreter" -> interpreter,
@@ -1830,6 +1831,21 @@ object BenchmarkInliner {
       |    let res = query p select (x, y, z) from ShortestDist(x, y; z);
       |    blackhole(res)
       |}
+      |""".stripMargin
+  }
+
+  private def fullyConnected: String = {
+    """
+      |pub def runBenchmark(): Unit \ IO =
+      |    let graph = List.range(0, 1200) |> List.map(x -> (x, x + 1));
+      |    let edges = inject graph into Edge;
+      |    let rules = #{
+      |        Path(x, y) :- Edge(x, y).
+      |        Path(x, z) :- Path(x, y), Edge(y, z).
+      |    };
+      |    let connected = query edges, rules select (src, dst) from Path(src, dst);
+      |    blackhole(connected)
+      |
       |""".stripMargin
   }
 
