@@ -435,8 +435,8 @@ object BenchmarkInliner {
   private def benchmarkWithIndividualMaxTime(runConfigs: List[(Options, String, String, Int)], maxWarmupNanos: Long, maxNanos: Long): ListMap[String, Run] = {
     implicit val sctx: SecurityContext = SecurityContext.AllPermissions
     val runs = scala.collection.mutable.ListBuffer.empty[Run]
-    for ((config, name, prog, maxRuns) <- runConfigs) {
-      debug(s"Benchmarking $name with optimizer ${if (config.xnooptimizer) "disabled" else "enabled"}")
+    for (((config, name, prog, maxRuns), i) <- runConfigs.zipWithIndex) {
+      debug(s"Benchmarking $name with optimizer ${if (config.xnooptimizer) "disabled" else "enabled"} ($i / ${runConfigs.size} / ${runConfigs.size * 2})")
       debug(s"Warming up for ${nanosToMinutes(maxWarmupNanos)} minutes...")
 
       val t0Compiler = System.nanoTime()
