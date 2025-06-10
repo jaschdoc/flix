@@ -326,7 +326,7 @@ object BenchmarkInliner {
 
   private def mkScriptSnippet(file: BenchmarkFile, asprofPath: Option[String], idx: Int, programs: Map[String, (String, Int)]): String = {
     s"""rm -f ${file.OutputFile}
-       |echo "Benchmarking ${file.JarFilePath} (${idx + 1 + programs.size} / ${programs.size * 2} / ${programs.size * 2})"
+       |echo "Benchmarking ${file.JarFilePath} (${idx + 1 + programs.size * 2} / ${programs.size * 4} / ${programs.size * 4})"
        |java ${asprofPath.map(p => s"-agentpath:$p=start,fmt=collapsed,event=alloc,file=${file.ProfilingOutFile}").getOrElse("")} -jar ${file.JarFilePath} >> ${file.OutputFile}
        |""".stripMargin
   }
