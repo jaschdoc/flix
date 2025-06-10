@@ -62,8 +62,6 @@ object BenchmarkInliner {
 
   private val CompilationBenchmarkTime: Int = 5
 
-  private val NumberOfRuns: Int = 1000
-
   /**
     * Set this to `true` for additional details during benchmarking.
     */
@@ -72,7 +70,7 @@ object BenchmarkInliner {
   /**
     * A set of benchmarks that are small and quick to run which are specifically targeted by the optimizer.
     */
-  private val MicroBenchmarks: Map[String, String] = Map(
+  private val MicroBenchmarks: Map[String, (String, Int)] = Map(
     "List.filter" -> listFilter,
     "List.foldLeft" -> listFoldLeft,
     "List.foldRight" -> listFoldRight,
@@ -90,13 +88,15 @@ object BenchmarkInliner {
     "FilterMap10k" -> filterMap10K,
     "Map10kOptimized" -> map10KOptimized,
     "FilterMap10kOptimized" -> filterMap10KOptimized,
-  )
+  ).map {
+    case (name, prog) => (name, (prog, 1000))
+  }
 
   /**
     * A set of benchmarks that are not targeted directly by the optimizer
     * but remain small programs.
     */
-  private val MediumBenchmarks: Map[String, String] = Map(
+  private val MediumBenchmarks: Map[String, (String, Int)] = Map(
     "MutualRecursion" -> mutualRecursion,
     "ImperativeForLoops" -> imperativeForLoops,
     "InternalMutability" -> internalMutability,
@@ -106,30 +106,34 @@ object BenchmarkInliner {
     "RailRoadNetwork" -> railRoadNetwork,
     "TopSort" -> topSort,
     "TwoSat" -> twoSat,
-  )
+  ).map {
+    case (name, prog) => (name, (prog, 500))
+  }
 
   /**
     * A set of benchmarks that are full programs or libraries or expensive functions.
     */
-  private val MacroBenchmarks: Map[String, String] = Map(
+  private val MacroBenchmarks: Map[String, (String, Int)] = Map(
     "ANSITerminal" -> ansiTerminal,
     "FordFulkerson" -> fordFulkerson,
     // "FlixJson" -> flixJson,
-    // "FloydWarshall" -> floydWarshall,
+    "FloydWarshall" -> floydWarshall,
     "IDE" -> ide,
     "IFDS" -> ifds,
-    // "Interpreter" -> interpreter,
-    // "ListSet" -> listSet,
-    // "Palindrome" -> palindrome,
+    "Interpreter" -> interpreter,
+    "ListSet" -> listSet,
+    "Palindrome" -> palindrome,
     "Parsers" -> parsers,
-    // "Sequence" -> sequence,
-    // "SingleSourceShortestDistance" -> singleSourceShortestDistance,
+    "Sequence" -> sequence,
+    "SingleSourceShortestDistance" -> singleSourceShortestDistance,
     "SingleSourceShortestPaths" -> singleSourceShortestPaths,
-    // "SingleSourceShortestPathsArbitrary" -> singleSourceShortestPathsArbitrary,
-    // "Stratifier" -> stratifier,
+    "SingleSourceShortestPathsArbitrary" -> singleSourceShortestPathsArbitrary,
+    "Stratifier" -> stratifier,
     "Talpin1992" -> talpin1992,
     "TuringMachine" -> turingMachine,
-  )
+  ).map {
+    case (name, prog) => (name, (prog, 100))
+  }
 
   private def baseDir: Path = Path.of("./build/").normalize()
 
@@ -219,15 +223,14 @@ object BenchmarkInliner {
     println(s"Took $seconds minutes total")
   }
 
-  private def preValidatePrograms(programs: Map[String, String], opts: Options): Unit = {
-    val confs = mkConfigurations(opts).flatMap(o => programs.map { case (name, prog) => (o, name, prog) })
+  private def preValidatePrograms(programs: Map[String, (String, Int)], opts: Options): Unit = {
+    val confs = mkConfigurations(opts).flatMap(o => programs.map { case (name, (prog, runs)) => (o, name, prog, runs) })
     implicit val sctx: SecurityContext = SecurityContext.AllPermissions
-    val mainProgEmpty = mainProg("")
-    for ((o, name, prog) <- confs) {
+    for ((o, name, prog, runs) <- confs) {
       debug(s"Checking $name with optimizer ${if (o.xnooptimizer) "disabled" else "enabled"}")
       val flix = new Flix().setOptions(o)
       flix.addSourceCode(s"$name", prog)
-      flix.addSourceCode("mainProg", mainProgEmpty)
+      flix.addSourceCode("mainProg", mainProg("", runs))
       flix.addSourceCode("blackHole", blackhole)
       flix.compile().unsafeGet
     }
@@ -237,7 +240,7 @@ object BenchmarkInliner {
     s"$suite.json"
   }
 
-  private def programsFromSuite(suite: Suite): Map[String, String] = {
+  private def programsFromSuite(suite: Suite): Map[String, (String, Int)] = {
     suite match {
       case Suite.Micro => MicroBenchmarks
       case Suite.Medium => MediumBenchmarks
@@ -252,19 +255,19 @@ object BenchmarkInliner {
     }
   }
 
-  private def writeJars(programs: Map[String, String], opts: Options, asprofPath: Option[String]): Unit = {
+  private def writeJars(programs: Map[String, (String, Int)], opts: Options, asprofPath: Option[String]): Unit = {
     val configs = mkConfigurations(opts.copy(loadClassFiles = false))
-      .flatMap(o => programs.map { case (name, prog) => (o, name, prog) })
+      .flatMap(o => programs.map { case (name, (prog, runs)) => (o, name, prog, runs) })
     configs.foreach(buildAndWriteJar)
     val snippets = configs.map {
-      case (o, name, _) => mkScriptSnippet(BenchmarkFile(name, o), asprofPath)
+      case (o, name, _, _) => mkScriptSnippet(BenchmarkFile(name, o), asprofPath)
     }
     val script = mkScript(snippets)
     FileOps.writeString(benchmarkScriptPath, script)
   }
 
-  private def buildAndWriteJar(config: (Options, String, String)): Unit = {
-    val (opts, name, prog) = config
+  private def buildAndWriteJar(config: (Options, String, String, Int)): Unit = {
+    val (opts, name, prog, runs) = config
 
     // Build
     implicit val sctx: SecurityContext = SecurityContext.AllPermissions
@@ -273,7 +276,7 @@ object BenchmarkInliner {
     Files.createDirectories(file.BuildDir)
     val flix = new Flix().setOptions(opts.copy(output = Some(file.BuildDir)))
     flix.addSourceCode(name, prog)
-    flix.addSourceCode("mainProg", mainProg(baseline.toString))
+    flix.addSourceCode("mainProg", mainProg(baseline.toString, runs))
     flix.addSourceCode("blackHole", blackhole)
     flix.compile().unsafeGet
 
@@ -360,14 +363,14 @@ object BenchmarkInliner {
       "macro"
   }
 
-  private def runBenchmarking(programs: Map[String, String], opts: Options): JsonAST.JObject = {
+  private def runBenchmarking(programs: Map[String, (String, Int)], opts: Options): JsonAST.JObject = {
     val totalTime = estimateTimeMinutes(programs.size, CompilationWarmupTime, CompilationBenchmarkTime)
     debug(s"Programs        : ${programs.size}")
     debug(s"Warmup          : $CompilationWarmupTime minutes")
     debug(s"Bench           : $CompilationBenchmarkTime minutes")
     debug(s"Total (Compiler): $totalTime minutes")
 
-    val runConfigs = mkConfigurations(opts).flatMap(o => programs.map { case (name, prog) => (o, name, prog) })
+    val runConfigs = mkConfigurations(opts).flatMap(o => programs.map { case (name, (prog, runs)) => (o, name, prog, runs) })
     val programExperiments = benchmarkWithIndividualMaxTime(runConfigs, minutesToNanos(CompilationWarmupTime), minutesToNanos(CompilationBenchmarkTime))
 
     val compilationTimeStats = programExperiments.m.map {
@@ -427,16 +430,16 @@ object BenchmarkInliner {
     o0 :: o1 :: Nil
   }
 
-  private def benchmarkWithIndividualMaxTime(runConfigs: List[(Options, String, String)], maxWarmupNanos: Long, maxNanos: Long): ListMap[String, Run] = {
+  private def benchmarkWithIndividualMaxTime(runConfigs: List[(Options, String, String, Int)], maxWarmupNanos: Long, maxNanos: Long): ListMap[String, Run] = {
     implicit val sctx: SecurityContext = SecurityContext.AllPermissions
     val runs = scala.collection.mutable.ListBuffer.empty[Run]
-    for ((config, name, prog) <- runConfigs) {
+    for ((config, name, prog, maxRuns) <- runConfigs) {
       debug(s"Benchmarking $name with optimizer ${if (config.xnooptimizer) "disabled" else "enabled"}")
       debug(s"Warming up for ${nanosToMinutes(maxWarmupNanos)} minutes...")
 
       val t0Compiler = System.nanoTime()
-      val _ = benchmarkCompilationWithMaxTime(config, name, prog, maxWarmupNanos)
-      val (compilationTimings, result) = benchmarkCompilationWithMaxTime(config, name, prog, maxNanos)
+      val _ = benchmarkCompilationWithMaxTime(config, name, prog, maxRuns, maxWarmupNanos)
+      val (compilationTimings, result) = benchmarkCompilationWithMaxTime(config, name, prog, maxRuns, maxNanos)
       val tDeltaCompiler = System.nanoTime() - t0Compiler
 
       debug(s"Took ${nanosToMinutes(tDeltaCompiler)} minutes total")
@@ -446,11 +449,11 @@ object BenchmarkInliner {
     ListMap.from(runs.map(r => (r.name, r)))
   }
 
-  private def benchmarkCompilationWithMaxTime(o: Options, name: String, prog: String, maxNanos: Long)(implicit sctx: SecurityContext): (Seq[(Long, List[(String, Long)])], Option[CompilationResult]) = {
+  private def benchmarkCompilationWithMaxTime(o: Options, name: String, prog: String, runs: Int, maxNanos: Long)(implicit sctx: SecurityContext): (Seq[(Long, List[(String, Long)])], Option[CompilationResult]) = {
     val compilationTimings = scala.collection.mutable.ListBuffer.empty[(Long, List[(String, Long)])]
     var usedTime = 0L
     var result: Option[CompilationResult] = None
-    val mainProgEmpty = mainProg("")
+    val mainProgEmpty = mainProg("", runs)
     while (usedTime < maxNanos) {
       val t0 = System.nanoTime()
       val flix = new Flix().setOptions(o)
@@ -568,7 +571,7 @@ object BenchmarkInliner {
       |""".stripMargin
   }
 
-  private def mainProg(baselineFilePath: String): String = {
+  private def mainProg(baselineFilePath: String, runs: Int): String = {
     s"""
        |import java.lang.System
        |pub def main(): Unit \\ IO = run {
@@ -577,7 +580,7 @@ object BenchmarkInliner {
        |    //
        |    let warmupTime = ${RunningTimeWarmupTime}i64;
        |    let benchTime  = ${RunningTimeBenchmarkTime}i64;
-       |    let runs       = $NumberOfRuns;
+       |    let runs       = $runs;
        |
        |    //
        |    // Benchmarking functions
