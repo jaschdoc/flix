@@ -261,8 +261,8 @@ object BenchmarkInliner {
     val configs = mkConfigurations(opts.copy(loadClassFiles = false))
       .flatMap(o => programs.map { case (name, (prog, runs)) => (o, name, prog, runs) })
     configs.foreach(buildAndWriteJar)
-    val snippets = configs.map {
-      case (o, name, _, _) => mkScriptSnippet(BenchmarkFile(name, o), asprofPath)
+    val snippets = configs.zipWithIndex.map {
+      case ((o, name, _, _), idx) => mkScriptSnippet(BenchmarkFile(name, o), asprofPath, idx, programs)
     }
     val script = mkScript(snippets)
     FileOps.writeString(benchmarkScriptPath, script)
@@ -324,9 +324,9 @@ object BenchmarkInliner {
     }
   }
 
-  private def mkScriptSnippet(file: BenchmarkFile, asprofPath: Option[String]): String = {
+  private def mkScriptSnippet(file: BenchmarkFile, asprofPath: Option[String], idx: Int, programs: Map[String, (String, Int)]): String = {
     s"""rm -f ${file.OutputFile}
-       |echo "Benchmarking ${file.JarFilePath}"
+       |echo "Benchmarking ${file.JarFilePath} (${idx + 1 + programs.size} / ${programs.size * 2} / ${programs.size * 2})"
        |java ${asprofPath.map(p => s"-agentpath:$p=start,fmt=collapsed,event=alloc,file=${file.ProfilingOutFile}").getOrElse("")} -jar ${file.JarFilePath} >> ${file.OutputFile}
        |""".stripMargin
   }
@@ -435,8 +435,8 @@ object BenchmarkInliner {
   private def benchmarkWithIndividualMaxTime(runConfigs: List[(Options, String, String, Int)], maxWarmupNanos: Long, maxNanos: Long): ListMap[String, Run] = {
     implicit val sctx: SecurityContext = SecurityContext.AllPermissions
     val runs = scala.collection.mutable.ListBuffer.empty[Run]
-    for ((config, name, prog, maxRuns) <- runConfigs) {
-      debug(s"Benchmarking $name with optimizer ${if (config.xnooptimizer) "disabled" else "enabled"}")
+    for (((config, name, prog, maxRuns), i) <- runConfigs.zipWithIndex) {
+      debug(s"Benchmarking $name with optimizer ${if (config.xnooptimizer) "disabled" else "enabled"} (${i + 1} / ${runConfigs.size} / ${runConfigs.size * 2})")
       debug(s"Warming up for ${nanosToMinutes(maxWarmupNanos)} minutes...")
 
       val t0Compiler = System.nanoTime()
