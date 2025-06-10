@@ -162,6 +162,7 @@ object BenchmarkInliner {
     println("Generating setup...")
 
     val programs = programsFromSuite(suite)
+    println(s"Found ${programs.size} programs")
 
     println("Building jars...")
     writeJars(programs, opts, asprofPath)
