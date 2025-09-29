@@ -15,7 +15,7 @@
  */
 package ca.uwaterloo.flix.tools.pkg
 
-import ca.uwaterloo.flix.api.Bootstrap
+import ca.uwaterloo.flix.api.pkgman.Bootstrap
 import ca.uwaterloo.flix.tools.pkg.Dependency.FlixDependency
 import ca.uwaterloo.flix.tools.pkg.github.GitHub
 import ca.uwaterloo.flix.util.{Formatter, Result}

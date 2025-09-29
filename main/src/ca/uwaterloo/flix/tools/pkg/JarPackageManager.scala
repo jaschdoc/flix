@@ -1,6 +1,6 @@
 package ca.uwaterloo.flix.tools.pkg
 
-import ca.uwaterloo.flix.api.Bootstrap
+import ca.uwaterloo.flix.api.pkgman.Bootstrap
 import ca.uwaterloo.flix.tools.pkg.Dependency.JarDependency
 import ca.uwaterloo.flix.util.Result
 import ca.uwaterloo.flix.util.Result.{Err, Ok}

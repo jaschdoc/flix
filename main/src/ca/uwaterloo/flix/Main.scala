@@ -18,7 +18,8 @@ package ca.uwaterloo.flix
 
 import ca.uwaterloo.flix.Main.Command.PlainLsp
 import ca.uwaterloo.flix.api.lsp.{LspServer, VSCodeLspServer}
-import ca.uwaterloo.flix.api.{Bootstrap, Flix, Version}
+import ca.uwaterloo.flix.api.pkgman.Bootstrap
+import ca.uwaterloo.flix.api.{Flix, Version}
 import ca.uwaterloo.flix.language.ast.Symbol
 import ca.uwaterloo.flix.language.phase.unification.zhegalkin.ZhegalkinPerf
 import ca.uwaterloo.flix.runtime.shell.Shell

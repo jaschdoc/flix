@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ca.uwaterloo.flix.api
+package ca.uwaterloo.flix.api.pkgman
 
-import ca.uwaterloo.flix.api.Bootstrap.{EXT_CLASS, EXT_FPKG, EXT_JAR, FLIX_TOML, LICENSE, README, getArtifactDirectory, getManifestFile, getPkgFile}
+import ca.uwaterloo.flix.api.{Flix, Version}
 import ca.uwaterloo.flix.language.ast.TypedAst
 import ca.uwaterloo.flix.language.ast.shared.SecurityContext
 import ca.uwaterloo.flix.language.phase.HtmlDocumentor
@@ -25,14 +25,14 @@ import ca.uwaterloo.flix.tools.pkg.FlixPackageManager.findFlixDependencies
 import ca.uwaterloo.flix.tools.pkg.github.GitHub
 import ca.uwaterloo.flix.tools.pkg.{FlixPackageManager, JarPackageManager, Manifest, ManifestParser, MavenPackageManager, PackageModules, ReleaseError}
 import ca.uwaterloo.flix.util.Result.{Err, Ok}
-import ca.uwaterloo.flix.util.Validation.{flatMapN, mapN}
-import ca.uwaterloo.flix.util.{Build, FileOps, Formatter, Result, Validation}
+import ca.uwaterloo.flix.util.Validation.flatMapN
+import ca.uwaterloo.flix.util.*
 
 import java.io.PrintStream
 import java.nio.file.*
 import java.util.zip.{ZipInputStream, ZipOutputStream}
 import scala.io.StdIn.readLine
-import scala.util.{Failure, Success, Try, Using}
+import scala.util.{Failure, Success, Using}
 
 
 object Bootstrap {

@@ -16,7 +16,8 @@
 
 package ca.uwaterloo.flix.runtime.shell
 
-import ca.uwaterloo.flix.api.{Bootstrap, BootstrapError, Flix, Version}
+import ca.uwaterloo.flix.api.pkgman.{Bootstrap, BootstrapError}
+import ca.uwaterloo.flix.api.{Flix, Version}
 import ca.uwaterloo.flix.language.CompilationMessage
 import ca.uwaterloo.flix.language.ast.Symbol
 import ca.uwaterloo.flix.language.ast.TypedAst.Root
